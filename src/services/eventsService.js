@@ -1,37 +1,50 @@
-import createWixClient from './wixClient.js';
+import { createWixDataService } from './wixDataService.js';
+import { getAppAccessToken } from './wixClient.js';
 import logger from '../utils/logger.js';
 
+const EVENTS_COLLECTION = 'SalonEvents';
+const REGISTRATIONS_COLLECTION = 'SalonEventRegistrations';
+
 /**
- * Service for managing Wix Events
+ * Service for managing Salon Events using Wix Data Collections
  */
 class EventsService {
+  /**
+   * Get data service instance
+   */
+  async getDataService(instanceId) {
+    const accessToken = await getAppAccessToken();
+    return createWixDataService(accessToken);
+  }
+
   /**
    * Get all upcoming events for a site
    */
   async getUpcomingEvents(instanceId, options = {}) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
       const { limit = 50, offset = 0, startDate = new Date() } = options;
 
-      const response = await wixClient.events.queryEvents({
+      const result = await dataService.query(EVENTS_COLLECTION, {
         filter: {
-          startDate: { $gte: startDate.toISOString() },
-          status: 'SCHEDULED',
+          startTime: { $gte: startDate.toISOString() },
+          status: { $eq: 'published' },
         },
-        sort: { startDate: 'asc' },
-        paging: { limit, offset },
+        sort: [{ fieldName: 'startTime', order: 'asc' }],
+        skip: offset,
+        limit,
       });
 
       logger.info('Retrieved upcoming events', {
         instanceId,
-        count: response.events?.length || 0,
+        count: result.items.length,
       });
 
-      return response.events || [];
+      return result.items.map(item => item.data);
     } catch (error) {
       logger.error('Failed to get upcoming events:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -40,34 +53,35 @@ class EventsService {
    */
   async createEvent(instanceId, eventData) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const event = await wixClient.events.createEvent({
-        event: {
-          title: eventData.title,
-          description: eventData.description,
-          scheduleConfig: {
-            startDate: eventData.startDate,
-            endDate: eventData.endDate,
-            timeZone: eventData.timeZone || 'America/New_York',
-          },
-          location: eventData.location,
-          categories: eventData.categories || ['SALON_EVENT'],
-          guestsCanInvite: eventData.guestsCanInvite || false,
-          registration: {
-            type: eventData.requiresRegistration ? 'RSVP' : 'NONE',
-            externalUrl: eventData.registrationUrl,
-          },
-        },
-      });
+      const event = {
+        title: eventData.title,
+        description: eventData.description,
+        eventType: eventData.eventType || 'special_event',
+        startTime: eventData.startDate || eventData.startTime,
+        endTime: eventData.endDate || eventData.endTime,
+        location: eventData.location || '',
+        capacity: eventData.capacity || 0,
+        registeredCount: 0,
+        price: eventData.price || 0,
+        imageUrl: eventData.imageUrl || '',
+        status: eventData.status || 'published',
+        isPublic: eventData.isPublic !== false,
+        createdBy: eventData.createdBy || 'admin',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const createdEvent = await dataService.insert(EVENTS_COLLECTION, event);
 
       logger.info('Event created', {
         instanceId,
-        eventId: event.id,
+        eventId: createdEvent.data._id,
         title: eventData.title,
       });
 
-      return event;
+      return createdEvent.data;
     } catch (error) {
       logger.error('Failed to create event:', error);
       throw error;
@@ -79,15 +93,17 @@ class EventsService {
    */
   async updateEvent(instanceId, eventId, eventData) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const event = await wixClient.events.updateEvent({
-        eventId,
-        event: eventData,
-      });
+      const updateData = {
+        ...eventData,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const event = await dataService.update(EVENTS_COLLECTION, eventId, updateData);
 
       logger.info('Event updated', { instanceId, eventId });
-      return event;
+      return event.data;
     } catch (error) {
       logger.error('Failed to update event:', error);
       throw error;
@@ -99,9 +115,9 @@ class EventsService {
    */
   async deleteEvent(instanceId, eventId) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      await wixClient.events.deleteEvent({ eventId });
+      await dataService.delete(EVENTS_COLLECTION, eventId);
 
       logger.info('Event deleted', { instanceId, eventId });
       return { success: true };
@@ -112,25 +128,106 @@ class EventsService {
   }
 
   /**
-   * Get event registrations/RSVPs
+   * Get event registrations
    */
   async getEventRegistrations(instanceId, eventId) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const response = await wixClient.events.queryRsvps({
-        filter: { eventId },
+      const result = await dataService.query(REGISTRATIONS_COLLECTION, {
+        filter: { eventId: { $eq: eventId } },
+        sort: [{ fieldName: 'registrationDate', order: 'desc' }],
       });
 
       logger.info('Retrieved event registrations', {
         instanceId,
         eventId,
-        count: response.rsvps?.length || 0,
+        count: result.items.length,
       });
 
-      return response.rsvps || [];
+      return result.items.map(item => item.data);
     } catch (error) {
       logger.error('Failed to get event registrations:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Register a customer for an event
+   */
+  async registerForEvent(instanceId, eventId, registrationData) {
+    try {
+      const dataService = await this.getDataService(instanceId);
+
+      // Check event capacity
+      const event = await dataService.get(EVENTS_COLLECTION, eventId);
+      if (event.data.capacity > 0 && event.data.registeredCount >= event.data.capacity) {
+        throw new Error('Event is at full capacity');
+      }
+
+      // Create registration
+      const registration = {
+        eventId,
+        customerId: registrationData.customerId,
+        customerName: registrationData.customerName,
+        customerEmail: registrationData.customerEmail,
+        customerPhone: registrationData.customerPhone || '',
+        registrationDate: new Date().toISOString(),
+        status: 'registered',
+        notes: registrationData.notes || '',
+        createdAt: new Date().toISOString(),
+      };
+
+      const createdRegistration = await dataService.insert(REGISTRATIONS_COLLECTION, registration);
+
+      // Update event registered count
+      await dataService.update(EVENTS_COLLECTION, eventId, {
+        registeredCount: (event.data.registeredCount || 0) + 1,
+      });
+
+      logger.info('Event registration created', {
+        instanceId,
+        eventId,
+        customerId: registrationData.customerId,
+      });
+
+      return createdRegistration.data;
+    } catch (error) {
+      logger.error('Failed to register for event:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel an event registration
+   */
+  async cancelRegistration(instanceId, registrationId) {
+    try {
+      const dataService = await this.getDataService(instanceId);
+
+      const registration = await dataService.get(REGISTRATIONS_COLLECTION, registrationId);
+      const eventId = registration.data.eventId;
+
+      // Update registration status
+      await dataService.update(REGISTRATIONS_COLLECTION, registrationId, {
+        status: 'cancelled',
+      });
+
+      // Decrease event registered count
+      const event = await dataService.get(EVENTS_COLLECTION, eventId);
+      await dataService.update(EVENTS_COLLECTION, eventId, {
+        registeredCount: Math.max(0, (event.data.registeredCount || 1) - 1),
+      });
+
+      logger.info('Event registration cancelled', {
+        instanceId,
+        registrationId,
+        eventId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to cancel registration:', error);
       throw error;
     }
   }

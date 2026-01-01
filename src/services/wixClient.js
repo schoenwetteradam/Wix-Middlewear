@@ -1,14 +1,11 @@
-import { createClient } from '@wix/sdk';
-import { events } from '@wix/events';
-import { services } from '@wix/bookings';
-import { contacts } from '@wix/crm';
-import { products } from '@wix/stores';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
 import axios from 'axios';
 
 /**
  * Creates a Wix SDK client with elevated app permissions
+ * NOTE: Wix SDK packages removed due to private registry dependencies
+ * This is a stub implementation that should be replaced with actual Wix SDK when available
  */
 export const createWixClient = async (instanceId = null) => {
   try {
@@ -22,17 +19,16 @@ export const createWixClient = async (instanceId = null) => {
       accessToken = await getAppAccessToken();
     }
 
-    const wixClient = createClient({
+    // Stub implementation - replace with actual Wix SDK client
+    const wixClient = {
       auth: accessToken,
-      modules: {
-        events,
-        services,
-        contacts,
-        products,
-      },
-    });
+      events: {},
+      services: {},
+      contacts: {},
+      products: {},
+    };
 
-    logger.debug('Wix client created successfully', { instanceId });
+    logger.debug('Wix client stub created successfully', { instanceId });
     return wixClient;
   } catch (error) {
     logger.error('Failed to create Wix client:', error);

@@ -1,27 +1,51 @@
-import createWixClient from './wixClient.js';
+import { createWixDataService } from './wixDataService.js';
+import { getAppAccessToken } from './wixClient.js';
 import logger from '../utils/logger.js';
 
+const APPOINTMENTS_COLLECTION = 'SalonAppointments';
+const STAFF_COLLECTION = 'SalonStaff';
+
 /**
- * Service for managing Wix Bookings/Appointments
+ * Service for managing Salon Appointments using Wix Data Collections
  */
 class BookingsService {
   /**
+   * Get data service instance
+   */
+  async getDataService(instanceId) {
+    const accessToken = await getAppAccessToken();
+    return createWixDataService(accessToken);
+  }
+
+  /**
    * Get all services (appointment types)
+   * Note: In production, create a SalonServices collection to manage service types
    */
   async getServices(instanceId) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      // Stub implementation - replace with actual SalonServices collection query
+      logger.info('Retrieved booking services (stub)', { instanceId });
 
-      const response = await wixClient.services.queryServices({
-        paging: { limit: 100 },
-      });
-
-      logger.info('Retrieved booking services', {
-        instanceId,
-        count: response.services?.length || 0,
-      });
-
-      return response.services || [];
+      return [
+        {
+          id: 'haircut',
+          name: 'Haircut',
+          duration: 60,
+          price: 50,
+        },
+        {
+          id: 'coloring',
+          name: 'Hair Coloring',
+          duration: 120,
+          price: 100,
+        },
+        {
+          id: 'massage',
+          name: 'Massage',
+          duration: 90,
+          price: 80,
+        },
+      ];
     } catch (error) {
       logger.error('Failed to get services:', error);
       throw error;
@@ -33,32 +57,41 @@ class BookingsService {
    */
   async createBooking(instanceId, bookingData) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const booking = await wixClient.services.createBooking({
-        booking: {
-          serviceId: bookingData.serviceId,
-          staffMemberId: bookingData.staffMemberId,
-          startTime: bookingData.startTime,
-          endTime: bookingData.endTime,
-          contactId: bookingData.contactId,
-          formInfo: {
-            additionalFields: bookingData.additionalFields || [],
-          },
-          numberOfParticipants: bookingData.numberOfParticipants || 1,
-        },
-      });
-
-      logger.info('Booking created', {
-        instanceId,
-        bookingId: booking.id,
+      const appointmentData = {
+        customerId: bookingData.contactId || bookingData.customerId,
+        customerName: bookingData.customerName,
+        customerEmail: bookingData.customerEmail,
+        customerPhone: bookingData.customerPhone,
         serviceId: bookingData.serviceId,
-        staffMemberId: bookingData.staffMemberId,
+        serviceName: bookingData.serviceName,
+        staffId: bookingData.staffMemberId || bookingData.staffId,
+        staffName: bookingData.staffName,
+        startTime: bookingData.startTime,
+        endTime: bookingData.endTime,
+        duration: bookingData.duration,
+        status: 'pending',
+        notes: bookingData.notes || '',
+        totalPrice: bookingData.totalPrice || 0,
+        depositPaid: false,
+        reminderSent: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const appointment = await dataService.insert(APPOINTMENTS_COLLECTION, appointmentData);
+
+      logger.info('Appointment created', {
+        instanceId,
+        appointmentId: appointment.data._id,
+        serviceId: bookingData.serviceId,
+        staffId: bookingData.staffMemberId,
       });
 
-      return booking;
+      return appointment.data;
     } catch (error) {
-      logger.error('Failed to create booking:', error);
+      logger.error('Failed to create appointment:', error);
       throw error;
     }
   }
@@ -68,12 +101,12 @@ class BookingsService {
    */
   async getStaffBookings(instanceId, staffMemberId, options = {}) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
       const { startDate, endDate, status } = options;
 
       const filter = {
-        staffMemberId,
+        staffId: { $eq: staffMemberId },
       };
 
       if (startDate) {
@@ -85,21 +118,21 @@ class BookingsService {
       }
 
       if (status) {
-        filter.status = status;
+        filter.status = { $eq: status };
       }
 
-      const response = await wixClient.services.queryBookings({
+      const result = await dataService.query(APPOINTMENTS_COLLECTION, {
         filter,
-        sort: { startTime: 'asc' },
+        sort: [{ fieldName: 'startTime', order: 'asc' }],
       });
 
-      logger.info('Retrieved staff bookings', {
+      logger.info('Retrieved staff appointments', {
         instanceId,
         staffMemberId,
-        count: response.bookings?.length || 0,
+        count: result.items.length,
       });
 
-      return response.bookings || [];
+      return result.items.map(item => item.data);
     } catch (error) {
       logger.error('Failed to get staff bookings:', error);
       throw error;
@@ -111,7 +144,7 @@ class BookingsService {
    */
   async getAllBookings(instanceId, options = {}) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
       const { startDate, endDate, status, limit = 100, offset = 0 } = options;
 
@@ -126,21 +159,23 @@ class BookingsService {
       }
 
       if (status) {
-        filter.status = status;
+        filter.status = { $eq: status };
       }
 
-      const response = await wixClient.services.queryBookings({
+      const result = await dataService.query(APPOINTMENTS_COLLECTION, {
         filter,
-        sort: { startTime: 'asc' },
-        paging: { limit, offset },
+        sort: [{ fieldName: 'startTime', order: 'asc' }],
+        skip: offset,
+        limit,
       });
 
-      logger.info('Retrieved all bookings', {
+      logger.info('Retrieved all appointments', {
         instanceId,
-        count: response.bookings?.length || 0,
+        count: result.items.length,
+        totalCount: result.totalCount,
       });
 
-      return response.bookings || [];
+      return result.items.map(item => item.data);
     } catch (error) {
       logger.error('Failed to get all bookings:', error);
       throw error;
@@ -152,22 +187,22 @@ class BookingsService {
    */
   async updateBookingStatus(instanceId, bookingId, status) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const booking = await wixClient.services.updateBooking({
-        bookingId,
-        booking: { status },
+      const appointment = await dataService.update(APPOINTMENTS_COLLECTION, bookingId, {
+        status,
+        updatedAt: new Date().toISOString(),
       });
 
-      logger.info('Booking status updated', {
+      logger.info('Appointment status updated', {
         instanceId,
         bookingId,
         status,
       });
 
-      return booking;
+      return appointment.data;
     } catch (error) {
-      logger.error('Failed to update booking status:', error);
+      logger.error('Failed to update appointment status:', error);
       throw error;
     }
   }
@@ -177,14 +212,17 @@ class BookingsService {
    */
   async cancelBooking(instanceId, bookingId) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      await wixClient.services.cancelBooking({ bookingId });
+      await dataService.update(APPOINTMENTS_COLLECTION, bookingId, {
+        status: 'cancelled',
+        updatedAt: new Date().toISOString(),
+      });
 
-      logger.info('Booking cancelled', { instanceId, bookingId });
+      logger.info('Appointment cancelled', { instanceId, bookingId });
       return { success: true };
     } catch (error) {
-      logger.error('Failed to cancel booking:', error);
+      logger.error('Failed to cancel appointment:', error);
       throw error;
     }
   }
@@ -194,51 +232,109 @@ class BookingsService {
    */
   async getStaffMembers(instanceId) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const response = await wixClient.services.queryStaffMembers({
-        paging: { limit: 100 },
+      const result = await dataService.query(STAFF_COLLECTION, {
+        filter: { isActive: { $eq: true } },
+        sort: [{ fieldName: 'name', order: 'asc' }],
       });
 
       logger.info('Retrieved staff members', {
         instanceId,
-        count: response.staffMembers?.length || 0,
+        count: result.items.length,
       });
 
-      return response.staffMembers || [];
+      return result.items.map(item => item.data);
     } catch (error) {
       logger.error('Failed to get staff members:', error);
-      throw error;
+      // Return empty array if collection doesn't exist yet
+      return [];
     }
   }
 
   /**
    * Get available time slots for a service and staff member
+   * This calculates available slots based on existing appointments
    */
   async getAvailableSlots(instanceId, serviceId, staffMemberId, date) {
     try {
-      const wixClient = await createWixClient(instanceId);
+      const dataService = await this.getDataService(instanceId);
 
-      const response = await wixClient.services.queryAvailability({
-        serviceId,
-        staffMemberId,
-        startDate: date,
-        endDate: new Date(new Date(date).getTime() + 24 * 60 * 60 * 1000), // Next day
+      // Get start and end of day
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Get all appointments for this staff member on this day
+      const result = await dataService.query(APPOINTMENTS_COLLECTION, {
+        filter: {
+          staffId: { $eq: staffMemberId },
+          startTime: { $gte: startOfDay.toISOString() },
+          endTime: { $lte: endOfDay.toISOString() },
+          status: { $ne: 'cancelled' },
+        },
+        sort: [{ fieldName: 'startTime', order: 'asc' }],
       });
+
+      const bookedSlots = result.items.map(item => ({
+        start: new Date(item.data.startTime),
+        end: new Date(item.data.endTime),
+      }));
+
+      // Generate available slots (9 AM - 6 PM, 30-minute intervals)
+      const availableSlots = this.generateTimeSlots(date, bookedSlots);
 
       logger.info('Retrieved available slots', {
         instanceId,
         serviceId,
         staffMemberId,
         date,
-        slotsCount: response.slots?.length || 0,
+        slotsCount: availableSlots.length,
       });
 
-      return response.slots || [];
+      return availableSlots;
     } catch (error) {
       logger.error('Failed to get available slots:', error);
       throw error;
     }
+  }
+
+  /**
+   * Helper: Generate time slots for a day
+   */
+  generateTimeSlots(date, bookedSlots = []) {
+    const slots = [];
+    const workStart = 9; // 9 AM
+    const workEnd = 18; // 6 PM
+    const slotDuration = 30; // 30 minutes
+
+    for (let hour = workStart; hour < workEnd; hour++) {
+      for (let minute = 0; minute < 60; minute += slotDuration) {
+        const slotStart = new Date(date);
+        slotStart.setHours(hour, minute, 0, 0);
+
+        const slotEnd = new Date(slotStart);
+        slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration);
+
+        // Check if slot is available (not overlapping with booked slots)
+        const isAvailable = !bookedSlots.some(booked =>
+          (slotStart >= booked.start && slotStart < booked.end) ||
+          (slotEnd > booked.start && slotEnd <= booked.end)
+        );
+
+        if (isAvailable) {
+          slots.push({
+            startTime: slotStart.toISOString(),
+            endTime: slotEnd.toISOString(),
+            available: true,
+          });
+        }
+      }
+    }
+
+    return slots;
   }
 }
 
