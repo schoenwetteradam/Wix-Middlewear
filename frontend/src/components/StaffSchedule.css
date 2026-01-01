@@ -1,0 +1,90 @@
+.staff-schedule {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.date-picker {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.staff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.staff-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.staff-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.staff-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.bookings-count {
+  background-color: #4A90E2;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.staff-appointments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border-left: 4px solid #4A90E2;
+}
+
+.schedule-item .time {
+  font-weight: 600;
+  color: #4A90E2;
+  min-width: 120px;
+  font-size: 14px;
+}
+
+.schedule-item .details {
+  flex: 1;
+}
+
+.schedule-item .service {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.schedule-item .client {
+  font-size: 13px;
+  color: #666;
+}
+
+.no-appointments {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+  font-style: italic;
+}

@@ -1,0 +1,46 @@
+{
+  "name": "salon-events-wix-app",
+  "version": "1.0.0",
+  "description": "Custom Wix app for salon events, appointments, and staff management",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "jest"
+  },
+  "keywords": [
+    "wix",
+    "salon",
+    "appointments",
+    "events",
+    "booking"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@wix/sdk": "^1.12.0",
+    "@wix/events": "^1.0.0",
+    "@wix/bookings": "^1.0.0",
+    "@wix/crm": "^1.0.0",
+    "@wix/ecom": "^1.0.0",
+    "@wix/stores": "^1.0.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.2",
+    "axios": "^1.6.0",
+    "body-parser": "^1.20.2",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "winston": "^3.11.0",
+    "node-cache": "^5.1.2",
+    "joi": "^17.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  }
+}
