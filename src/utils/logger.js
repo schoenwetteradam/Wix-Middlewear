@@ -1,9 +1,9 @@
 import winston from 'winston';
 import config from '../config/config.js';
 
-// Create base transports array with console logging
+// Only use console logging for serverless environments
+// Vercel captures all console output in their logging system
 const transports = [
-  // Write all logs to console
   new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),
@@ -19,17 +19,6 @@ const transports = [
     ),
   }),
 ];
-
-// Only add file transports when NOT running in serverless environment
-// Vercel and other serverless platforms have read-only filesystems
-if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  transports.push(
-    // Write all logs with level 'error' and below to error.log
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    // Write all logs to combined.log
-    new winston.transports.File({ filename: 'logs/combined.log' })
-  );
-}
 
 const logger = winston.createLogger({
   level: config.logging.level,
