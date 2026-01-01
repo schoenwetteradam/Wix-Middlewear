@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salon Events Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .widget-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .widget-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .widget-header h2 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .widget-header p {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .widget-loading,
+        .widget-error {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .widget-error {
+            color: #c62828;
+        }
+
+        .widget-events {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .widget-event {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .widget-event:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .widget-event-date {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 70px;
+            padding: 15px;
+            background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .widget-event-date .month {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .widget-event-date .day {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .widget-event-details {
+            flex: 1;
+        }
+
+        .widget-event-title {
+            font-size: 20px;
+            color: #333;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+
+        .widget-event-description {
+            font-size: 14px;
+            color: #666;
+            margin: 0 0 15px 0;
+            line-height: 1.5;
+        }
+
+        .widget-event-meta {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .widget-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .widget-btn:hover {
+            background: linear-gradient(135deg, #357ABD 0%, #2868A8 100%);
+            transform: translateY(-1px);
+        }
+
+        .widget-no-events {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-style: italic;
+        }
+
+        @media (max-width: 600px) {
+            .widget-event {
+                flex-direction: column;
+            }
+
+            .widget-event-date {
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container">
+        <div class="widget-header">
+            <h2>Upcoming Salon Events</h2>
+            <p>Join us for these exciting events!</p>
+        </div>
+
+        <div id="widget-content" class="widget-loading">
+            Loading events...
+        </div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_URL = window.location.origin + '/api';
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return {
+                month: date.toLocaleDateString('en-US', { month: 'short' }),
+                day: date.getDate(),
+                fullDate: date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                time: date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+            };
+        }
+
+        // Load events
+        async function loadEvents() {
+            const contentDiv = document.getElementById('widget-content');
+
+            try {
+                // For demo purposes, show sample data
+                // In production, this would fetch from: fetch(`${API_URL}/events`)
+
+                const sampleEvents = [
+                    {
+                        id: '1',
+                        title: 'Summer Hair Care Workshop',
+                        description: 'Learn the best techniques for maintaining healthy hair during summer. Our expert stylists will share tips and tricks!',
+                        scheduleConfig: {
+                            startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        },
+                        location: 'Main Salon',
+                        registration: {
+                            externalUrl: '#'
+                        }
+                    },
+                    {
+                        id: '2',
+                        title: 'Bridal Styling Consultation',
+                        description: 'Special consultation for brides-to-be. Discover the perfect hairstyle for your wedding day.',
+                        scheduleConfig: {
+                            startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                        },
+                        location: 'VIP Suite',
+                        registration: {
+                            externalUrl: '#'
+                        }
+                    },
+                    {
+                        id: '3',
+                        title: 'Color Trends 2024',
+                        description: 'Explore the latest color trends and techniques. Free consultation included!',
+                        scheduleConfig: {
+                            startDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+                        },
+                        location: 'Main Salon',
+                        registration: {
+                            externalUrl: '#'
+                        }
+                    }
+                ];
+
+                if (sampleEvents.length === 0) {
+                    contentDiv.className = 'widget-no-events';
+                    contentDiv.innerHTML = '<p>No upcoming events at this time. Check back soon!</p>';
+                    return;
+                }
+
+                contentDiv.className = 'widget-events';
+                contentDiv.innerHTML = sampleEvents.map(event => {
+                    const date = formatDate(event.scheduleConfig.startDate);
+                    return `
+                        <div class="widget-event">
+                            <div class="widget-event-date">
+                                <div class="month">${date.month}</div>
+                                <div class="day">${date.day}</div>
+                            </div>
+                            <div class="widget-event-details">
+                                <h3 class="widget-event-title">${event.title}</h3>
+                                <p class="widget-event-description">${event.description}</p>
+                                <div class="widget-event-meta">
+                                    <span>🕐 ${date.time}</span>
+                                    ${event.location ? `<span>📍 ${event.location}</span>` : ''}
+                                </div>
+                                ${event.registration?.externalUrl ?
+                                    `<a href="${event.registration.externalUrl}" class="widget-btn" target="_blank" rel="noopener noreferrer">
+                                        Register Now
+                                    </a>`
+                                    : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Failed to load events:', error);
+                contentDiv.className = 'widget-error';
+                contentDiv.innerHTML = '<p>Unable to load events at this time. Please try again later.</p>';
+            }
+        }
+
+        // Load events when page loads
+        document.addEventListener('DOMContentLoaded', loadEvents);
+    </script>
+</body>
+</html>
