@@ -1,8 +1,119 @@
 # Salon Events & Appointments - Wix Custom App
 
-A comprehensive Wix app for managing salon appointments, events, staff scheduling, and KPI metrics.
+A comprehensive Wix app for managing salon appointments, events, and staff scheduling with **Wix Data Collections** storage and **Vercel** deployment.
 
-## Features
+## 🚀 Quick Start
+
+**New to this project?** Follow our step-by-step guide:
+
+👉 **[COMPLETE SETUP GUIDE](./COMPLETE_SETUP_GUIDE.md)** 👈
+
+This guide walks you through:
+1. Creating your Wix Custom App (10 min)
+2. Setting up Wix Data Collections (15 min)
+3. Deploying to Vercel (10 min)
+4. Connecting everything together (5 min)
+
+---
+
+## ⚡ What This App Does
+
+Your app integrates with Wix to provide:
+- **Appointment Management** - Book and manage salon appointments
+- **Event Management** - Create workshops, classes, and promotions
+- **Staff Scheduling** - Manage staff calendars and availability
+- **Real-time Data** - All data stored in Wix Data Collections
+- **Scalable Hosting** - Deployed on Vercel (serverless)
+
+---
+
+## 📦 What's Included
+
+### Database (Wix Data Collections)
+- ✅ **No external database needed**
+- ✅ Uses Wix's built-in Data Collections
+- ✅ Auto-scaling and real-time updates
+- ✅ Data isolated per Wix site
+
+### Backend (Node.js + Express)
+- REST API for appointments and events
+- Direct integration with Wix Data API
+- JWT authentication
+- Automated reminders and notifications
+
+### Frontend (React)
+- Dashboard for salon owners
+- Staff schedule view
+- Appointment management interface
+- Event creation and registration
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐
+│   Wix Site      │
+│  (Your Salon)   │
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐      ┌──────────────────┐
+│  Vercel App     │◄────►│ Wix Data         │
+│  (This Code)    │      │ Collections      │
+└─────────────────┘      └──────────────────┘
+         │
+         ↓
+    ┌────────┐
+    │ Users  │
+    └────────┘
+```
+
+**How it works:**
+1. Your Wix site users interact with the app
+2. App (hosted on Vercel) processes requests
+3. Data is stored/retrieved from Wix Data Collections
+4. Everything scales automatically
+
+---
+
+## 📋 Prerequisites
+
+Before you start, you need:
+- A **Wix account** with a site
+- A **Vercel account** (free tier works)
+- **Node.js 18+** installed locally
+- **Git** installed
+
+---
+
+## 🎯 Setup Instructions
+
+### Option A: Complete Setup (Recommended for first-time users)
+
+Follow the **[COMPLETE SETUP GUIDE](./COMPLETE_SETUP_GUIDE.md)** for detailed step-by-step instructions.
+
+### Option B: Quick Setup (For experienced developers)
+
+1. **Create Wix App:**
+   - Go to https://dev.wix.com/
+   - Create new app with "Wix Data - Read & Write" permission
+   - Copy App ID and App Secret
+
+2. **Create Data Collections:**
+   - See `WIX_DATA_COLLECTIONS.md` for schemas
+   - Create 5 collections in your Wix site
+
+3. **Deploy to Vercel:**
+   ```bash
+   vercel --prod
+   ```
+   Set environment variables: `WIX_APP_ID`, `WIX_APP_SECRET`, `JWT_SECRET`
+
+4. **Update Wix App URLs:**
+   - Set App URL and Redirect URL to your Vercel deployment
+
+---
 
 ### 🗓️ Appointment Management
 - Create, view, update, and cancel appointments
@@ -37,138 +148,64 @@ A comprehensive Wix app for managing salon appointments, events, staff schedulin
 - Customizable email templates
 
 ### 🔗 Wix Integration
-- Full Wix Bookings API integration
-- Wix Events API integration
-- Wix CRM/Contacts integration
-- Wix eCommerce integration support
+- **Wix Data Collections** for data storage
+- Wix Data REST API integration
 - OAuth authentication
 - Webhooks for real-time updates
+- No external database required
 
-## Technology Stack
+---
+
+## 📚 Documentation
 
 ### Backend
-- Node.js + Express
-- Wix JavaScript SDK
+- **Node.js + Express** - Web server
+- **Wix Data REST API** - Database operations
+- **Vercel** - Serverless deployment
 - JWT authentication
 - Winston logging
 - Node-cron for scheduled tasks
-- Axios for HTTP requests
 
 ### Frontend
-- React 18
+- **React 18**
 - React Router
-- Axios
+- Axios for API calls
 - date-fns for date formatting
-- Recharts for data visualization
+- Recharts for analytics
 
-## Project Structure
+### Database
+- **Wix Data Collections** - Managed by Wix
+- No setup or maintenance required
+- Auto-scaling
+- Real-time sync
+
+---
+
+## 🗂️ Project Structure
 
 ```
 Wix-Middlewear/
 ├── src/
-│   ├── config/
-│   │   └── config.js              # App configuration
-│   ├── middleware/
-│   │   ├── auth.js                # Authentication middleware
-│   │   └── errorHandler.js        # Error handling
-│   ├── routes/
-│   │   ├── appointments.js        # Appointment endpoints
-│   │   ├── events.js              # Event endpoints
-│   │   ├── staff.js               # Staff endpoints
-│   │   ├── dashboard.js           # Dashboard/KPI endpoints
-│   │   ├── notifications.js       # Notification endpoints
-│   │   ├── webhooks.js            # Wix webhook handlers
-│   │   └── health.js              # Health check
 │   ├── services/
-│   │   ├── wixClient.js           # Wix SDK client
-│   │   ├── bookingsService.js     # Bookings service
-│   │   ├── eventsService.js       # Events service
-│   │   ├── crmService.js          # CRM service
-│   │   ├── notificationService.js # Email/SMS notifications
-│   │   └── reminderService.js     # Automated reminders
-│   ├── utils/
-│   │   └── logger.js              # Winston logger
-│   └── server.js                  # Main Express server
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Dashboard.js       # Main dashboard
-│   │   │   ├── StaffSchedule.js   # Staff schedule view
-│   │   │   ├── Appointments.js    # Appointments view
-│   │   │   ├── Events.js          # Events management
-│   │   │   └── EventsWidget.js    # Customer-facing widget
-│   │   ├── utils/
-│   │   │   └── api.js             # API client
-│   │   ├── App.js
-│   │   └── index.js
-│   └── package.json
-├── logs/                          # Application logs
-├── .env.example                   # Environment variables template
-├── .gitignore
-├── package.json
-├── WIX_APP_SETUP_GUIDE.md        # Wix app configuration guide
-└── DEPLOYMENT_GUIDE.md           # Deployment instructions
+│   │   ├── wixDataService.js       # Wix Data API client
+│   │   ├── bookingsService.js      # Appointment management
+│   │   ├── eventsService.js        # Event management
+│   │   ├── wixClient.js            # OAuth client
+│   │   ├── notificationService.js  # Notifications
+│   │   └── reminderService.js      # Automated reminders
+│   ├── routes/                     # API endpoints
+│   ├── middleware/                 # Auth & error handling
+│   └── server.js                   # Express server
+├── frontend/                       # React dashboard
+├── vercel.json                     # Vercel configuration
+├── COMPLETE_SETUP_GUIDE.md        # 👈 Start here!
+├── WIX_DATA_COLLECTIONS.md        # Database schemas
+└── VERCEL_DEPLOYMENT.md           # Deployment guide
 ```
 
-## Quick Start
+---
 
-### 1. Installation
-
-```bash
-# Clone repository
-git clone <repository-url>
-cd Wix-Middlewear
-
-# Install backend dependencies
-npm install
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
-```
-
-### 2. Environment Setup
-
-```bash
-# Copy example env file
-cp .env.example .env
-
-# Edit .env with your Wix app credentials
-nano .env
-```
-
-Required environment variables:
-```bash
-WIX_APP_ID=a88e57a2-8663-43a0-954a-1d669869b8bb
-WIX_APP_SECRET=641a5b63-f3b1-40c6-8b45-d7e14d54f8f0
-WIX_PUBLIC_KEY="your-public-key-from-wix-dashboard"
-PORT=3000
-NODE_ENV=development
-```
-
-### 3. Create Logs Directory
-
-```bash
-mkdir -p logs
-```
-
-### 4. Run Development Server
-
-```bash
-# Terminal 1: Backend
-npm run dev
-
-# Terminal 2: Frontend
-cd frontend
-npm start
-```
-
-Backend runs on: http://localhost:3000
-Frontend runs on: http://localhost:3001
-
-## API Documentation
+## 🔌 API Endpoints
 
 ### Health Check
 ```
@@ -266,7 +303,7 @@ Automated reminders run on a cron schedule:
 
 Modify schedules in `src/services/reminderService.js`.
 
-## Features in Detail
+## ✨ Features in Detail
 
 ### KPI Metrics Calculated
 - Total appointments (filtered by date range)
