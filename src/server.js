@@ -57,24 +57,29 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
-// Start server
+// Start server (only in non-serverless environments)
 const PORT = config.server.port;
 
-app.listen(PORT, () => {
-  logger.info(`🚀 Salon Events Wix App server running on port ${PORT}`);
-  logger.info(`📍 Environment: ${config.server.env}`);
-  logger.info(`🔗 Base URL: ${config.server.baseUrl}`);
-});
+// Check if running in serverless environment (Vercel)
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
-  process.exit(0);
-});
+if (!isServerless) {
+  app.listen(PORT, () => {
+    logger.info(`🚀 Salon Events Wix App server running on port ${PORT}`);
+    logger.info(`📍 Environment: ${config.server.env}`);
+    logger.info(`🔗 Base URL: ${config.server.baseUrl}`);
+  });
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing HTTP server');
-  process.exit(0);
-});
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received: closing HTTP server');
+    process.exit(0);
+  });
+
+  process.on('SIGINT', () => {
+    logger.info('SIGINT signal received: closing HTTP server');
+    process.exit(0);
+  });
+}
 
 export default app;
