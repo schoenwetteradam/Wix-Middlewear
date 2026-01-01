@@ -57,24 +57,27 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
-// Start server
-const PORT = config.server.port;
+// Start server only when not running as serverless function (Vercel)
+// Vercel sets VERCEL env variable, so we check for its absence
+if (!process.env.VERCEL) {
+  const PORT = config.server.port;
 
-app.listen(PORT, () => {
-  logger.info(`🚀 Salon Events Wix App server running on port ${PORT}`);
-  logger.info(`📍 Environment: ${config.server.env}`);
-  logger.info(`🔗 Base URL: ${config.server.baseUrl}`);
-});
+  app.listen(PORT, () => {
+    logger.info(`🚀 Salon Events Wix App server running on port ${PORT}`);
+    logger.info(`📍 Environment: ${config.server.env}`);
+    logger.info(`🔗 Base URL: ${config.server.baseUrl}`);
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
-  process.exit(0);
-});
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received: closing HTTP server');
+    process.exit(0);
+  });
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing HTTP server');
-  process.exit(0);
-});
+  process.on('SIGINT', () => {
+    logger.info('SIGINT signal received: closing HTTP server');
+    process.exit(0);
+  });
+}
 
 export default app;
