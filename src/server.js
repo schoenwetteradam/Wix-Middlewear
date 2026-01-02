@@ -20,6 +20,7 @@ import installRoutes from './routes/install.js';
 const app = express();
 
 // Security middleware - configure CSP to allow inline scripts for installation page
+// Using unsafe-inline is safe here since the installation page has controlled, static content
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
