@@ -39,5 +39,9 @@
   },
   "devDependencies": {
     "react-scripts": "^5.0.1"
+  },
+  "overrides": {
+    "rollup-plugin-terser": "npm:@rollup/plugin-terser@^3.0.0",
+    "sourcemap-codec": "npm:@jridgewell/sourcemap-codec@^1.4.15"
   }
 }
