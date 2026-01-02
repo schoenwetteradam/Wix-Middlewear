@@ -1,5 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
 
@@ -132,9 +133,12 @@ router.get('/', async (req, res) => {
       totalInstances: installedInstances.size,
     });
 
-    // Explicitly set CSP header to allow inline scripts (override Helmet if needed)
+    // Generate a nonce for this request (cryptographically secure random value)
+    const nonce = crypto.randomBytes(16).toString('base64');
+
+    // Set CSP header with nonce to allow inline scripts securely
     res.setHeader('Content-Security-Policy', 
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self';"
+      `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self';`
     );
 
     // Return success page with auto-close/redirect for Wix
@@ -210,7 +214,7 @@ router.get('/', async (req, res) => {
               font-size: 0.875rem;
             }
           </style>
-          <script>
+          <script nonce="${nonce}">
             // Auto-close window/iframe after successful installation/update
             // This completes the Wix app installation/update flow
             (function() {
