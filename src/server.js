@@ -15,6 +15,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import notificationRoutes from './routes/notifications.js';
 import webhookRoutes from './routes/webhooks.js';
 import healthRoutes from './routes/health.js';
+import installRoutes from './routes/install.js';
 
 const app = express();
 
@@ -40,8 +41,15 @@ app.use('/plugins-and-webhooks', express.text({ type: '*/*' }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Root endpoint - API information
-app.get('/', (req, res) => {
+// Root endpoint - Handle Wix app installation or show API information
+app.get('/', (req, res, next) => {
+  // If there's a token parameter, this is a Wix app installation request
+  if (req.query.token) {
+    // Forward to installation handler
+    return installRoutes(req, res, next);
+  }
+
+  // Otherwise, show API information
   res.json({
     service: 'Salon Events Wix App API',
     version: '1.0.0',
@@ -54,12 +62,16 @@ app.get('/', (req, res) => {
       dashboard: '/api/dashboard',
       notifications: '/api/notifications',
       webhooks: '/plugins-and-webhooks',
+      install: '/?token=<installation_token>',
     },
   });
 });
 
 // Health check endpoint
 app.use('/health', healthRoutes);
+
+// Installation routes (for admin/debugging)
+app.use('/install', installRoutes);
 
 // API routes
 app.use('/api/appointments', appointmentRoutes);
