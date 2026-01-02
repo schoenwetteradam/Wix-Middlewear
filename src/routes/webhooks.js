@@ -124,6 +124,51 @@ router.post('/events/created', verifyWebhookSignature, asyncHandler(async (req, 
 }));
 
 /**
+ * POST /plugins-and-webhooks/app/installed
+ * Webhook handler for when the app is installed on a site
+ * This is the recommended way to capture the instanceId
+ */
+router.post('/app/installed', verifyWebhookSignature, asyncHandler(async (req, res) => {
+  const { instanceId, data } = req.wixEvent;
+
+  logger.info('App installation webhook received', {
+    instanceId,
+    eventType: req.wixEvent.eventType,
+    data,
+  });
+
+  // TODO: Store the instanceId in a database for production use
+  // For now, just log it
+  logger.info('App installed successfully via webhook', {
+    instanceId,
+    timestamp: new Date(),
+  });
+
+  res.json({ success: true });
+}));
+
+/**
+ * POST /plugins-and-webhooks/app/removed
+ * Webhook handler for when the app is removed from a site
+ */
+router.post('/app/removed', verifyWebhookSignature, asyncHandler(async (req, res) => {
+  const { instanceId, data } = req.wixEvent;
+
+  logger.info('App removal webhook received', {
+    instanceId,
+    eventType: req.wixEvent.eventType,
+  });
+
+  // TODO: Clean up instanceId from database in production
+  logger.info('App removed from site', {
+    instanceId,
+    timestamp: new Date(),
+  });
+
+  res.json({ success: true });
+}));
+
+/**
  * Catch-all for service plugin endpoints and other webhook events
  */
 router.post('/*', verifyWebhookSignature, asyncHandler(async (req, res) => {

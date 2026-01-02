@@ -11,12 +11,63 @@ const installedInstances = new Map();
 /**
  * Wix app installation endpoint
  * Called when a user installs the app from Wix
+ * Handles multiple formats: token parameter, instance parameter, or appInstance parameter
  */
 router.get('/', async (req, res) => {
   try {
-    const { token } = req.query;
+    const { token, instance, appInstance } = req.query;
+    let instanceId = null;
+    let tokenData = null;
 
-    if (!token) {
+    // Check for instance ID in different query parameters
+    if (instance) {
+      // Direct instance ID parameter
+      instanceId = instance;
+      logger.info('Instance ID from query parameter:', { instanceId });
+    } else if (appInstance) {
+      // App instance parameter
+      instanceId = appInstance;
+      logger.info('Instance ID from appInstance parameter:', { instanceId });
+    } else if (token) {
+      // Token parameter - could be JWT, instance ID, or other format
+      try {
+        // Try to decode as JWT first
+        const decodedToken = jwt.decode(token);
+
+        if (decodedToken && typeof decodedToken === 'object') {
+          // It's a valid JWT
+          logger.info('Decoded JWT token:', { decodedToken });
+
+          // If we have a public key, verify the signature
+          if (config.wix.publicKey) {
+            try {
+              jwt.verify(token, config.wix.publicKey, {
+                algorithms: ['RS256'],
+              });
+              logger.info('Token signature verified');
+            } catch (verifyError) {
+              logger.warn('Token signature verification failed:', verifyError.message);
+              // Continue anyway - we'll use the decoded data
+            }
+          }
+
+          // Extract instance ID from JWT
+          instanceId = decodedToken.instanceId || decodedToken.instance || decodedToken.sub || decodedToken.app_instance_id;
+          tokenData = decodedToken;
+        } else {
+          // Not a JWT - might be the instance ID itself
+          instanceId = token;
+          logger.info('Using token as instance ID directly:', { instanceId });
+        }
+      } catch (error) {
+        // Failed to decode as JWT - use token as instance ID
+        instanceId = token;
+        logger.info('Token is not JWT, using as instance ID:', { instanceId });
+      }
+    }
+
+    // If we still don't have an instance ID, show error
+    if (!instanceId) {
       return res.status(400).send(`
         <!DOCTYPE html>
         <html>
@@ -47,69 +98,7 @@ router.get('/', async (req, res) => {
           <body>
             <div class="container">
               <h1>❌ Installation Error</h1>
-              <p>No installation token provided. Please try installing the app again from your Wix dashboard.</p>
-            </div>
-          </body>
-        </html>
-      `);
-    }
-
-    // Decode the token (Wix sends a signed JWT)
-    let decodedToken;
-    try {
-      // First, decode without verification to see the structure
-      decodedToken = jwt.decode(token);
-      logger.info('Decoded installation token:', { decodedToken });
-
-      // If we have a public key, verify the signature
-      if (config.wix.publicKey) {
-        decodedToken = jwt.verify(token, config.wix.publicKey, {
-          algorithms: ['RS256'],
-        });
-        logger.info('Token signature verified');
-      }
-    } catch (error) {
-      logger.error('Failed to decode installation token:', error);
-      // Continue anyway - we'll still try to extract the instance ID
-      decodedToken = jwt.decode(token);
-    }
-
-    // Extract instance information from the token
-    const instanceId = decodedToken?.instanceId || decodedToken?.instance || decodedToken?.sub;
-
-    if (!instanceId) {
-      logger.error('No instance ID found in token:', { decodedToken });
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Installation Error</title>
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              }
-              .container {
-                background: white;
-                padding: 3rem;
-                border-radius: 1rem;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                text-align: center;
-                max-width: 500px;
-              }
-              h1 { color: #e53e3e; margin-bottom: 1rem; }
-              p { color: #4a5568; line-height: 1.6; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>❌ Invalid Token</h1>
-              <p>The installation token is invalid. Please contact support or try installing the app again.</p>
+              <p>No installation token or instance ID provided. Please try installing the app again from your Wix dashboard.</p>
             </div>
           </body>
         </html>
@@ -120,7 +109,7 @@ router.get('/', async (req, res) => {
     installedInstances.set(instanceId, {
       instanceId,
       installedAt: new Date(),
-      tokenData: decodedToken,
+      tokenData: tokenData,
     });
 
     logger.info('App installed successfully', {
