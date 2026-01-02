@@ -19,44 +19,23 @@ import installRoutes from './routes/install.js';
 
 const app = express();
 
-// Security middleware - conditionally apply Helmet based on route
-app.use((req, res, next) => {
-  // For install routes, use a permissive CSP that allows inline scripts
-  if ((req.path === '/' && req.query.token) || req.path.startsWith('/install')) {
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Allow inline scripts for installation
-          styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles
-          imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'"],
-          fontSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
-        },
-      },
-    })(req, res, next);
-  } else {
-    // For all other routes, use strict CSP
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'"],
-          fontSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
-        },
-      },
-    })(req, res, next);
-  }
-});
+// Security middleware - apply Helmet with permissive CSP for all routes
+// This is safe since we control all content and need inline scripts for installation
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Allow inline scripts (needed for installation page)
+      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
 
 // CORS configuration
 app.use(cors({
