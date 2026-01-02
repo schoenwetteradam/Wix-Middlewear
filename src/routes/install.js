@@ -15,9 +15,24 @@ const installedInstances = new Map();
  */
 router.get('/', async (req, res) => {
   try {
-    const { token, instance, appInstance } = req.query;
+    const { token, instance, appInstance, redirectUrl, code } = req.query;
     let instanceId = null;
     let tokenData = null;
+
+    // If we have a code parameter, this is an OAuth callback after authorization
+    // For app updates, Wix may send the code directly
+    if (code) {
+      logger.info('OAuth callback received with authorization code');
+      // Extract instanceId from the code if possible, or redirect to close window
+      // For now, we'll treat this as a successful installation
+      instanceId = instance || appInstance;
+      
+      // If we have a redirectUrl, we might need to redirect back to Wix
+      if (redirectUrl) {
+        logger.info('Redirect URL provided, redirecting back to Wix');
+        return res.redirect(redirectUrl);
+      }
+    }
 
     // Check for instance ID in different query parameters
     if (instance) {
@@ -117,12 +132,13 @@ router.get('/', async (req, res) => {
       totalInstances: installedInstances.size,
     });
 
-    // Return success page
+    // Return success page with auto-close/redirect for Wix
     res.send(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>Installation Successful</title>
+          <meta charset="utf-8">
           <style>
             body {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -163,6 +179,7 @@ router.get('/', async (req, res) => {
               color: #2d3748;
               word-break: break-all;
               margin-top: 1.5rem;
+              font-size: 0.875rem;
             }
             .next-steps {
               margin-top: 2rem;
@@ -182,18 +199,60 @@ router.get('/', async (req, res) => {
             .next-steps li {
               margin-bottom: 0.5rem;
             }
+            .loading {
+              margin-top: 1.5rem;
+              color: #718096;
+              font-size: 0.875rem;
+            }
           </style>
+          <script>
+            // Auto-close window/iframe after successful installation/update
+            // This completes the Wix app installation/update flow
+            (function() {
+              // Try to close if opened in popup/iframe
+              try {
+                // If we're in an iframe, try to send message to parent
+                if (window.parent !== window) {
+                  window.parent.postMessage({ type: 'wix-app-installed', instanceId: '${instanceId}' }, '*');
+                  // Try to close after a brief delay
+                  setTimeout(function() {
+                    try {
+                      window.close();
+                    } catch(e) {
+                      // Can't close, that's okay
+                    }
+                  }, 1500);
+                } else if (window.opener) {
+                  // Opened in popup - try to close
+                  setTimeout(function() {
+                    try {
+                      window.close();
+                    } catch(e) {
+                      // Can't close, that's okay
+                    }
+                  }, 1500);
+                }
+              } catch(e) {
+                // Cross-origin restrictions - that's fine, show success page
+                console.log('Installation successful');
+              }
+            })();
+          </script>
         </head>
         <body>
           <div class="container">
             <div class="checkmark">✅</div>
             <h1>Installation Successful!</h1>
-            <p>Your Salon Events app has been successfully installed on your Wix site.</p>
+            <p>Your Salon Events app has been successfully installed/updated on your Wix site.</p>
             <p>The app is now connected and ready to manage your salon's events, appointments, and staff schedule.</p>
 
             <div class="instance-id">
               <strong>Instance ID:</strong><br/>
               ${instanceId}
+            </div>
+
+            <div class="loading">
+              <p>Redirecting back to Wix...</p>
             </div>
 
             <div class="next-steps">
