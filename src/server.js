@@ -64,8 +64,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Root endpoint - Handle Wix app installation or serve React app
 app.get('/', (req, res, next) => {
-  // If there's a token parameter, this is a Wix app installation request
-  if (req.query.token) {
+  // If there's a token, instance, appInstance, or code parameter, this is a Wix app installation request
+  if (req.query.token || req.query.instance || req.query.appInstance || req.query.code) {
     // Forward to installation handler
     return installRoutes(req, res, next);
   }
