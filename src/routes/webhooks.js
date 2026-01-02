@@ -1,24 +1,66 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
 import notificationService from '../services/notificationService.js';
 import crmService from '../services/crmService.js';
+import config from '../config/config.js';
 
 const router = express.Router();
+
+/**
+ * Middleware to verify Wix webhook JWT signature
+ * Must be used before any webhook handlers
+ */
+const verifyWebhookSignature = (req, res, next) => {
+  try {
+    if (!config.wix.publicKey) {
+      throw new Error('WIX_PUBLIC_KEY not configured');
+    }
+
+    // Verify JWT signature and decode payload
+    const rawPayload = jwt.verify(req.body, config.wix.publicKey);
+    const event = JSON.parse(rawPayload.data);
+    const eventData = JSON.parse(event.data);
+
+    // Attach parsed data to request object for handlers
+    req.wixEvent = {
+      eventType: event.eventType,
+      instanceId: event.instanceId,
+      eventId: event.eventId,
+      eventTime: event.eventTime,
+      data: eventData,
+    };
+
+    logger.debug('Webhook signature verified', {
+      eventType: event.eventType,
+      instanceId: event.instanceId,
+    });
+
+    next();
+  } catch (err) {
+    logger.error('Webhook signature verification failed:', err);
+    res.status(400).json({
+      error: 'Webhook signature verification failed',
+      message: err.message,
+    });
+  }
+};
 
 /**
  * POST /plugins-and-webhooks/bookings/created
  * Webhook handler for when a booking is created
  */
-router.post('/bookings/created', asyncHandler(async (req, res) => {
-  const payload = req.body;
+router.post('/bookings/created', verifyWebhookSignature, asyncHandler(async (req, res) => {
+  const { instanceId, data } = req.wixEvent;
 
-  logger.info('Booking created webhook received', { payload });
+  logger.info('Booking created webhook received', {
+    instanceId,
+    eventType: req.wixEvent.eventType,
+  });
 
   try {
-    const { data } = payload;
     const booking = data.booking;
-    const instanceId = data.instanceId;
 
     // Send confirmation email
     if (booking.contactId) {
@@ -39,15 +81,16 @@ router.post('/bookings/created', asyncHandler(async (req, res) => {
  * POST /plugins-and-webhooks/bookings/cancelled
  * Webhook handler for when a booking is cancelled
  */
-router.post('/bookings/cancelled', asyncHandler(async (req, res) => {
-  const payload = req.body;
+router.post('/bookings/cancelled', verifyWebhookSignature, asyncHandler(async (req, res) => {
+  const { instanceId, data } = req.wixEvent;
 
-  logger.info('Booking cancelled webhook received', { payload });
+  logger.info('Booking cancelled webhook received', {
+    instanceId,
+    eventType: req.wixEvent.eventType,
+  });
 
   try {
-    const { data } = payload;
     const booking = data.booking;
-    const instanceId = data.instanceId;
 
     // Send cancellation email
     if (booking.contactId) {
@@ -68,22 +111,26 @@ router.post('/bookings/cancelled', asyncHandler(async (req, res) => {
  * POST /plugins-and-webhooks/events/created
  * Webhook handler for when an event is created
  */
-router.post('/events/created', asyncHandler(async (req, res) => {
-  const payload = req.body;
+router.post('/events/created', verifyWebhookSignature, asyncHandler(async (req, res) => {
+  const { instanceId, data } = req.wixEvent;
 
-  logger.info('Event created webhook received', { payload });
+  logger.info('Event created webhook received', {
+    instanceId,
+    eventType: req.wixEvent.eventType,
+  });
 
   // Process event creation
   res.json({ success: true });
 }));
 
 /**
- * Catch-all for service plugin endpoints
+ * Catch-all for service plugin endpoints and other webhook events
  */
-router.post('/*', asyncHandler(async (req, res) => {
+router.post('/*', verifyWebhookSignature, asyncHandler(async (req, res) => {
   logger.info('Generic webhook/service plugin called', {
     path: req.path,
-    body: req.body,
+    eventType: req.wixEvent.eventType,
+    instanceId: req.wixEvent.instanceId,
   });
 
   res.json({ success: true });

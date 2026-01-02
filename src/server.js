@@ -35,6 +35,8 @@ app.use(morgan('combined', {
 }));
 
 // Body parsing middleware
+// Note: Webhook routes use express.text() to preserve raw body for JWT verification
+app.use('/plugins-and-webhooks', express.text({ type: '*/*' }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
