@@ -38,6 +38,24 @@ app.use(morgan('combined', {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Root endpoint - API information
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Salon Events Wix App API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      appointments: '/api/appointments',
+      events: '/api/events',
+      staff: '/api/staff',
+      dashboard: '/api/dashboard',
+      notifications: '/api/notifications',
+      webhooks: '/plugins-and-webhooks',
+    },
+  });
+});
+
 // Health check endpoint
 app.use('/health', healthRoutes);
 
