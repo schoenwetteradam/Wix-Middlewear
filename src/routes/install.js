@@ -28,9 +28,18 @@ router.get('/', async (req, res) => {
       // For now, we'll treat this as a successful installation
       instanceId = instance || appInstance;
       
-      // If we have a redirectUrl, we might need to redirect back to Wix
+      // If we have a redirectUrl, redirect back to Wix immediately
+      // This is critical for app updates to be recognized
       if (redirectUrl) {
-        logger.info('Redirect URL provided, redirecting back to Wix');
+        logger.info('Redirect URL provided, redirecting back to Wix', { redirectUrl, instanceId });
+        // Store instance before redirecting
+        if (instanceId) {
+          installedInstances.set(instanceId, {
+            instanceId,
+            installedAt: new Date(),
+            updated: true,
+          });
+        }
         return res.redirect(redirectUrl);
       }
     }
@@ -218,33 +227,56 @@ router.get('/', async (req, res) => {
             // Auto-close window/iframe after successful installation/update
             // This completes the Wix app installation/update flow
             (function() {
-              // Try to close if opened in popup/iframe
-              try {
-                // If we're in an iframe, try to send message to parent
-                if (window.parent !== window) {
-                  window.parent.postMessage({ type: 'wix-app-installed', instanceId: '${instanceId}' }, '*');
-                  // Try to close after a brief delay
+              // Signal to Wix that installation is complete
+              const signalComplete = function() {
+                try {
+                  // Try multiple methods to signal completion to Wix
+                  if (window.parent !== window) {
+                    // In iframe - send message to parent
+                    window.parent.postMessage({ 
+                      type: 'wix-app-installed', 
+                      instanceId: '${instanceId}',
+                      status: 'success'
+                    }, '*');
+                    
+                    // Also try Wix-specific message format
+                    window.parent.postMessage({
+                      type: 'app-installed',
+                      instanceId: '${instanceId}'
+                    }, '*');
+                  }
+                  
+                  if (window.opener) {
+                    // Opened in popup - send message to opener
+                    window.opener.postMessage({
+                      type: 'wix-app-installed',
+                      instanceId: '${instanceId}',
+                      status: 'success'
+                    }, '*');
+                  }
+                  
+                  // Try to close window after signaling
                   setTimeout(function() {
                     try {
-                      window.close();
+                      if (window.close) {
+                        window.close();
+                      }
                     } catch(e) {
-                      // Can't close, that's okay
+                      // Can't close, that's okay - Wix will handle it
+                      console.log('Installation successful - window will close automatically');
                     }
-                  }, 1500);
-                } else if (window.opener) {
-                  // Opened in popup - try to close
-                  setTimeout(function() {
-                    try {
-                      window.close();
-                    } catch(e) {
-                      // Can't close, that's okay
-                    }
-                  }, 1500);
+                  }, 1000);
+                } catch(e) {
+                  // Cross-origin restrictions - that's fine
+                  console.log('Installation successful');
                 }
-              } catch(e) {
-                // Cross-origin restrictions - that's fine, show success page
-                console.log('Installation successful');
-              }
+              };
+              
+              // Signal immediately
+              signalComplete();
+              
+              // Also try after a short delay in case Wix needs time to set up listeners
+              setTimeout(signalComplete, 500);
             })();
           </script>
         </head>
