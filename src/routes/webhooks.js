@@ -283,8 +283,11 @@ router.post('/*', verifyWebhookSignature, asyncHandler(async (req, res) => {
   switch (eventType) {
     case 'wix.bookings.v2.booking_created':
     case 'wix.bookings.v1.booking_created':
+    case 'wix.bookings.v2.booking_updated':
+    case 'wix.bookings.v1.booking_updated':
     case 'bookings/booking-created':
-      logger.info('Booking created event detected via catch-all handler', {
+    case 'bookings/booking-updated':
+      logger.info('Booking created/updated event detected via catch-all handler', {
         eventType,
         instanceId,
       });
