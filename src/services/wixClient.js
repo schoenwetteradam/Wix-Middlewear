@@ -40,6 +40,12 @@ export const createWixClient = async (instanceId = null) => {
  * Gets an app-level access token using client credentials
  */
 export const getAppAccessToken = async () => {
+  // Check if credentials are configured
+  if (!config.wix.appId || !config.wix.appSecret) {
+    logger.warn('Wix credentials not configured (WIX_APP_ID or WIX_APP_SECRET missing)');
+    throw new Error('Wix credentials not configured');
+  }
+
   try {
     const response = await axios.post(config.wixOAuth.tokenEndpoint, {
       grant_type: 'client_credentials',
