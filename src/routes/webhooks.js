@@ -226,6 +226,9 @@ router.post('/events/created', verifyWebhookSignature, asyncHandler(async (req, 
 router.post('/app/installed', verifyWebhookSignature, asyncHandler(async (req, res) => {
   const { instanceId, data } = req.wixEvent;
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'webhooks.js:226',message:'App installed webhook received',data:{instanceId,eventType:req.wixEvent.eventType,hasData:!!data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   logger.info('App installation webhook received', {
     instanceId,
     eventType: req.wixEvent.eventType,

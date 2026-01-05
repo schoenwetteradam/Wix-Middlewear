@@ -16,6 +16,9 @@ const installedInstances = new Map();
  */
 router.get('/', async (req, res) => {
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:17',message:'Install route entry',data:{query:req.query,headers:Object.keys(req.headers),path:req.path,method:req.method},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     const { token, instance, appInstance, redirectUrl, code } = req.query;
     let instanceId = null;
     let tokenData = null;
@@ -23,6 +26,9 @@ router.get('/', async (req, res) => {
     // If we have a code parameter, this is an OAuth callback after authorization
     // For app updates, Wix may send the code directly
     if (code) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:25',message:'OAuth callback detected',data:{code:code?.substring(0,20)+'...',instance,appInstance,redirectUrl,hasRedirectUrl:!!redirectUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       logger.info('OAuth callback received with authorization code');
       // Extract instanceId from the code if possible, or redirect to close window
       // For now, we'll treat this as a successful installation
@@ -31,6 +37,9 @@ router.get('/', async (req, res) => {
       // If we have a redirectUrl, redirect back to Wix immediately
       // This is critical for app updates to be recognized
       if (redirectUrl) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:33',message:'Redirecting with redirectUrl',data:{redirectUrl,instanceId,hasInstanceId:!!instanceId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         logger.info('Redirect URL provided, redirecting back to Wix', { redirectUrl, instanceId });
         // Store instance before redirecting
         if (instanceId) {
@@ -46,10 +55,16 @@ router.get('/', async (req, res) => {
 
     // Check for instance ID in different query parameters
     if (instance) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:49',message:'Instance ID from instance param',data:{instanceId:instance},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // Direct instance ID parameter
       instanceId = instance;
       logger.info('Instance ID from query parameter:', { instanceId });
     } else if (appInstance) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:54',message:'Instance ID from appInstance param',data:{instanceId:appInstance},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // App instance parameter
       instanceId = appInstance;
       logger.info('Instance ID from appInstance parameter:', { instanceId });
@@ -78,6 +93,9 @@ router.get('/', async (req, res) => {
 
           // Extract instance ID from JWT
           instanceId = decodedToken.instanceId || decodedToken.instance || decodedToken.sub || decodedToken.app_instance_id;
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:81',message:'Instance ID extracted from JWT',data:{instanceId,decodedKeys:Object.keys(decodedToken)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
           tokenData = decodedToken;
         } else {
           // Not a JWT - might be the instance ID itself
@@ -91,53 +109,30 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // If we still don't have an instance ID, show error
+    // If we still don't have an instance ID, log it but still show success page
+    // Wix may send instanceId via webhook or in a different format
     if (!instanceId) {
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Installation Error</title>
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              }
-              .container {
-                background: white;
-                padding: 3rem;
-                border-radius: 1rem;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                text-align: center;
-                max-width: 500px;
-              }
-              h1 { color: #e53e3e; margin-bottom: 1rem; }
-              p { color: #4a5568; line-height: 1.6; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>❌ Installation Error</h1>
-              <p>No installation token or instance ID provided. Please try installing the app again from your Wix dashboard.</p>
-            </div>
-          </body>
-        </html>
-      `);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:95',message:'No instance ID found in query params',data:{query:req.query},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      logger.warn('Installation request received without instance ID', { query: req.query });
+      // Generate a temporary instanceId for display purposes
+      instanceId = 'pending-webhook';
     }
 
-    // Store the instance information
-    installedInstances.set(instanceId, {
-      instanceId,
-      installedAt: new Date(),
-      tokenData: tokenData,
-    });
+    // Store the instance information (only if we have a real instanceId)
+    if (instanceId && instanceId !== 'pending-webhook') {
+      installedInstances.set(instanceId, {
+        instanceId,
+        installedAt: new Date(),
+        tokenData: tokenData,
+      });
+    }
 
-    logger.info('App installed successfully', {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:134',message:'Sending HTML response',data:{instanceId,responseType:'HTML',hasRedirectUrl:!!redirectUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    logger.info('App installation page accessed', {
       instanceId,
       totalInstances: installedInstances.size,
     });
@@ -224,24 +219,23 @@ router.get('/', async (req, res) => {
             }
           </style>
           <script nonce="${nonce}">
-            // Auto-close window/iframe after successful installation/update
-            // This completes the Wix app installation/update flow
+            // Signal to Wix that installation page has loaded
+            // User can interact with the page to configure widgets/settings
             (function() {
-              // Signal to Wix that installation is complete
-              const signalComplete = function() {
+              // Signal to Wix that installation page is ready (but don't auto-close)
+              const signalReady = function() {
                 try {
-                  // Try multiple methods to signal completion to Wix
+                  // Send message to parent window (if in iframe) to signal page is ready
                   if (window.parent !== window) {
-                    // In iframe - send message to parent
                     window.parent.postMessage({ 
-                      type: 'wix-app-installed', 
+                      type: 'wix-app-install-ready', 
                       instanceId: '${instanceId}',
-                      status: 'success'
+                      status: 'ready'
                     }, '*');
                     
                     // Also try Wix-specific message format
                     window.parent.postMessage({
-                      type: 'app-installed',
+                      type: 'app-install-ready',
                       instanceId: '${instanceId}'
                     }, '*');
                   }
@@ -249,34 +243,19 @@ router.get('/', async (req, res) => {
                   if (window.opener) {
                     // Opened in popup - send message to opener
                     window.opener.postMessage({
-                      type: 'wix-app-installed',
+                      type: 'wix-app-install-ready',
                       instanceId: '${instanceId}',
-                      status: 'success'
+                      status: 'ready'
                     }, '*');
                   }
-                  
-                  // Try to close window after signaling
-                  setTimeout(function() {
-                    try {
-                      if (window.close) {
-                        window.close();
-                      }
-                    } catch(e) {
-                      // Can't close, that's okay - Wix will handle it
-                      console.log('Installation successful - window will close automatically');
-                    }
-                  }, 1000);
                 } catch(e) {
                   // Cross-origin restrictions - that's fine
-                  console.log('Installation successful');
+                  console.log('Installation page loaded');
                 }
               };
               
               // Signal immediately
-              signalComplete();
-              
-              // Also try after a short delay in case Wix needs time to set up listeners
-              setTimeout(signalComplete, 500);
+              signalReady();
             })();
           </script>
         </head>
@@ -292,24 +271,29 @@ router.get('/', async (req, res) => {
               ${instanceId}
             </div>
 
-            <div class="loading">
-              <p>Redirecting back to Wix...</p>
-            </div>
+            ${instanceId === 'pending-webhook' ? '<div class="loading"><p style="color: #ed8936;">Instance ID will be confirmed via webhook...</p></div>' : ''}
 
             <div class="next-steps">
               <h2>Next Steps:</h2>
               <ul>
+                <li><strong>Add widgets to your site:</strong> Go to your Wix site editor and add the Salon Events widget to your pages</li>
                 <li>Configure your app settings in the Wix dashboard</li>
                 <li>Set up your staff schedules and availability</li>
                 <li>Create your first event or appointment</li>
                 <li>Customize notifications and reminders</li>
               </ul>
+              <p style="margin-top: 1.5rem; padding: 1rem; background: #f0f4f8; border-radius: 0.5rem; color: #2d3748;">
+                <strong>Note:</strong> You can close this window when you're ready. The app installation is complete and you can now add widgets to your site pages.
+              </p>
             </div>
           </div>
         </body>
       </html>
     `);
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:312',message:'Installation error',data:{error:error.message,stack:error.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     logger.error('Installation error:', error);
     res.status(500).send(`
       <!DOCTYPE html>
