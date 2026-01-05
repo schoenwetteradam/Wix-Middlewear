@@ -64,9 +64,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Root endpoint - Handle Wix app installation or serve React app
 app.get('/', (req, res, next) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:66',message:'Root endpoint hit',data:{hasToken:!!req.query.token,queryKeys:Object.keys(req.query),path:req.path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   // If there's a token parameter, this is a Wix app installation request
   if (req.query.token) {
     // Forward to installation handler
