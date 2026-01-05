@@ -72,7 +72,7 @@ app.get('/', (req, res, next) => {
   }
 
   // Otherwise, serve the React frontend
-  const frontendPath = path.join(__dirname, '../../frontend/build/index.html');
+  const frontendPath = path.join(__dirname, '../frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
       // If build doesn't exist, fall back to API info
@@ -117,7 +117,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/plugins-and-webhooks', webhookRoutes);
 
 // Serve static files from React frontend build (if it exists)
-const frontendBuildPath = path.join(__dirname, '../../frontend/build');
+const frontendBuildPath = path.join(__dirname, '../frontend/build');
 app.use(express.static(frontendBuildPath));
 
 // Catch-all handler: serve React app for client-side routing
@@ -132,7 +132,7 @@ app.get('*', (req, res, next) => {
   }
 
   // Serve React app for all other routes (client-side routing)
-  const frontendPath = path.join(__dirname, '../../frontend/build/index.html');
+  const frontendPath = path.join(__dirname, '../frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
       logger.warn(`Frontend file not found for ${req.path}:`, err.message);
