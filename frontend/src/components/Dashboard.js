@@ -17,17 +17,49 @@ function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const [kpisRes, upcomingRes] = await Promise.all([
-        dashboardAPI.getKPIs(),
-        dashboardAPI.getUpcoming({ limit: 5 }),
+        dashboardAPI.getKPIs().catch(err => {
+          console.error('Failed to load KPIs:', err);
+          return { data: { data: null } };
+        }),
+        dashboardAPI.getUpcoming({ limit: 5 }).catch(err => {
+          console.error('Failed to load upcoming:', err);
+          return { data: { data: null } };
+        }),
       ]);
 
-      setKpis(kpisRes.data.data);
-      setUpcoming(upcomingRes.data.data);
-      setError(null);
+      // Handle partial success
+      if (kpisRes?.data?.data) {
+        setKpis(kpisRes.data.data);
+      } else {
+        setKpis({
+          totalAppointments: 0,
+          completedAppointments: 0,
+          pendingAppointments: 0,
+          totalRevenue: 0,
+        });
+      }
+
+      if (upcomingRes?.data?.data) {
+        setUpcoming(upcomingRes.data.data);
+      } else {
+        setUpcoming({ appointments: [], events: [] });
+      }
     } catch (err) {
-      setError('Failed to load dashboard data');
-      console.error(err);
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to load dashboard data';
+      setError(errorMessage);
+      console.error('Dashboard load error:', err);
+      
+      // Set default values on error
+      setKpis({
+        totalAppointments: 0,
+        completedAppointments: 0,
+        pendingAppointments: 0,
+        totalRevenue: 0,
+      });
+      setUpcoming({ appointments: [], events: [] });
     } finally {
       setLoading(false);
     }
