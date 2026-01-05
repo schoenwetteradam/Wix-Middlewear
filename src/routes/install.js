@@ -1,6 +1,5 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
 
@@ -109,19 +108,8 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // If we still don't have an instance ID, log it but still show success page
-    // Wix may send instanceId via webhook or in a different format
-    if (!instanceId) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:95',message:'No instance ID found in query params',data:{query:req.query},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      logger.warn('Installation request received without instance ID', { query: req.query });
-      // Generate a temporary instanceId for display purposes
-      instanceId = 'pending-webhook';
-    }
-
-    // Store the instance information (only if we have a real instanceId)
-    if (instanceId && instanceId !== 'pending-webhook') {
+    // Store the instance information if we have it
+    if (instanceId) {
       installedInstances.set(instanceId, {
         instanceId,
         installedAt: new Date(),
@@ -129,167 +117,19 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:134',message:'Sending HTML response',data:{instanceId,responseType:'HTML',hasRedirectUrl:!!redirectUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    logger.info('App installation page accessed', {
+    logger.info('App installation completed', {
       instanceId,
       totalInstances: installedInstances.size,
     });
 
-    // Generate a nonce for this request (cryptographically secure random value)
-    const nonce = crypto.randomBytes(16).toString('base64');
+    // If we have a redirectUrl, redirect back to Wix immediately
+    if (redirectUrl) {
+      return res.redirect(redirectUrl);
+    }
 
-    // Set CSP header with nonce to allow inline scripts securely
-    res.setHeader('Content-Security-Policy', 
-      `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self';`
-    );
-
-    // Return success page with auto-close/redirect for Wix
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Installation Successful</title>
-          <meta charset="utf-8">
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              margin: 0;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            }
-            .container {
-              background: white;
-              padding: 3rem;
-              border-radius: 1rem;
-              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-              text-align: center;
-              max-width: 500px;
-            }
-            h1 {
-              color: #48bb78;
-              margin-bottom: 1rem;
-              font-size: 2rem;
-            }
-            p {
-              color: #4a5568;
-              line-height: 1.6;
-              margin-bottom: 1.5rem;
-            }
-            .checkmark {
-              font-size: 4rem;
-              margin-bottom: 1rem;
-            }
-            .instance-id {
-              background: #f7fafc;
-              padding: 1rem;
-              border-radius: 0.5rem;
-              font-family: monospace;
-              color: #2d3748;
-              word-break: break-all;
-              margin-top: 1.5rem;
-              font-size: 0.875rem;
-            }
-            .next-steps {
-              margin-top: 2rem;
-              padding-top: 2rem;
-              border-top: 1px solid #e2e8f0;
-              text-align: left;
-            }
-            .next-steps h2 {
-              color: #2d3748;
-              font-size: 1.2rem;
-              margin-bottom: 1rem;
-            }
-            .next-steps ul {
-              color: #4a5568;
-              line-height: 1.8;
-            }
-            .next-steps li {
-              margin-bottom: 0.5rem;
-            }
-            .loading {
-              margin-top: 1.5rem;
-              color: #718096;
-              font-size: 0.875rem;
-            }
-          </style>
-          <script nonce="${nonce}">
-            // Signal to Wix that installation page has loaded
-            // User can interact with the page to configure widgets/settings
-            (function() {
-              // Signal to Wix that installation page is ready (but don't auto-close)
-              const signalReady = function() {
-                try {
-                  // Send message to parent window (if in iframe) to signal page is ready
-                  if (window.parent !== window) {
-                    window.parent.postMessage({ 
-                      type: 'wix-app-install-ready', 
-                      instanceId: '${instanceId}',
-                      status: 'ready'
-                    }, '*');
-                    
-                    // Also try Wix-specific message format
-                    window.parent.postMessage({
-                      type: 'app-install-ready',
-                      instanceId: '${instanceId}'
-                    }, '*');
-                  }
-                  
-                  if (window.opener) {
-                    // Opened in popup - send message to opener
-                    window.opener.postMessage({
-                      type: 'wix-app-install-ready',
-                      instanceId: '${instanceId}',
-                      status: 'ready'
-                    }, '*');
-                  }
-                } catch(e) {
-                  // Cross-origin restrictions - that's fine
-                  console.log('Installation page loaded');
-                }
-              };
-              
-              // Signal immediately
-              signalReady();
-            })();
-          </script>
-        </head>
-        <body>
-          <div class="container">
-            <div class="checkmark">✅</div>
-            <h1>Installation Successful!</h1>
-            <p>Your Salon Events app has been successfully installed/updated on your Wix site.</p>
-            <p>The app is now connected and ready to manage your salon's events, appointments, and staff schedule.</p>
-
-            <div class="instance-id">
-              <strong>Instance ID:</strong><br/>
-              ${instanceId}
-            </div>
-
-            ${instanceId === 'pending-webhook' ? '<div class="loading"><p style="color: #ed8936;">Instance ID will be confirmed via webhook...</p></div>' : ''}
-
-            <div class="next-steps">
-              <h2>Next Steps:</h2>
-              <ul>
-                <li><strong>Add widgets to your site:</strong> Go to your Wix site editor and add the Salon Events widget to your pages</li>
-                <li>Configure your app settings in the Wix dashboard</li>
-                <li>Set up your staff schedules and availability</li>
-                <li>Create your first event or appointment</li>
-                <li>Customize notifications and reminders</li>
-              </ul>
-              <p style="margin-top: 1.5rem; padding: 1rem; background: #f0f4f8; border-radius: 0.5rem; color: #2d3748;">
-                <strong>Note:</strong> You can close this window when you're ready. The app installation is complete and you can now add widgets to your site pages.
-              </p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
+    // Otherwise, redirect to Wix site management (or return minimal success response)
+    // This completes installation silently - user goes back to Wix to add widgets
+    res.status(200).send('<!DOCTYPE html><html><head><script>if(window.parent!==window)window.parent.postMessage({type:"wix-app-installed",status:"success"}, "*");window.close();</script></head><body>Installation complete. Please close this window.</body></html>');
   } catch (error) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:312',message:'Installation error',data:{error:error.message,stack:error.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
