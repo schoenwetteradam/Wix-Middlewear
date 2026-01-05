@@ -12,6 +12,15 @@ import logger from '../utils/logger.js';
 export const validateWixJWT = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    
+    // In development, allow requests without auth for testing
+    if (!authHeader && process.env.NODE_ENV === 'development') {
+      logger.warn('No authorization header provided (development mode - allowing request)');
+      req.wixAuth = null;
+      req.instanceId = null;
+      return next();
+    }
+    
     if (!authHeader) {
       logger.warn('No authorization header provided');
       return res.status(401).json({ error: 'No authorization token provided' });
@@ -27,47 +36,85 @@ export const validateWixJWT = (req, res, next) => {
       return res.status(401).json({ error: 'No authorization token provided' });
     }
 
+    // If no public key configured, try to decode without verification (development only)
     if (!config.wix.publicKey) {
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn('WIX_PUBLIC_KEY not configured - decoding token without verification (development only)');
+        try {
+          const decoded = jwt.decode(token);
+          if (decoded) {
+            req.wixAuth = decoded;
+            req.instanceId = decoded.instanceId || decoded.sub || decoded.app_instance_id;
+            return next();
+          }
+        } catch (decodeError) {
+          logger.error('Failed to decode token:', decodeError);
+        }
+      }
       logger.error('WIX_PUBLIC_KEY not configured');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    // Verify JWT signature using Wix public key
-    // Note: Frontend tokens from fetchWithAuth are signed by Wix and should verify
-    const decoded = jwt.verify(token, config.wix.publicKey, {
-      algorithms: ['RS256'],
-    });
-
-    // Extract instanceId from token
-    // InstanceId can be in various locations depending on token type
-    const instanceId = 
-      decoded.instanceId ||
-      decoded.data?.metadata?.instanceId ||
-      decoded.data?.instanceId ||
-      decoded.sub ||
-      decoded.app_instance_id;
-
-    // Attach decoded token to request
-    req.wixAuth = decoded;
-    req.instanceId = instanceId;
-
-    if (!instanceId) {
-      logger.warn('Could not extract instanceId from token', {
-        tokenKeys: Object.keys(decoded),
-        hasData: !!decoded.data
+    try {
+      // Verify JWT signature using Wix public key
+      // Note: Frontend tokens from fetchWithAuth are signed by Wix and should verify
+      const decoded = jwt.verify(token, config.wix.publicKey, {
+        algorithms: ['RS256'],
       });
-      // Some endpoints might work without instanceId, but log for debugging
-    }
 
-    logger.debug('JWT validated successfully', { 
-      instanceId: req.instanceId,
-      hasInstanceId: !!req.instanceId
-    });
-    next();
+      // Extract instanceId from token
+      // InstanceId can be in various locations depending on token type
+      const instanceId = 
+        decoded.instanceId ||
+        decoded.data?.metadata?.instanceId ||
+        decoded.data?.instanceId ||
+        decoded.sub ||
+        decoded.app_instance_id;
+
+      // Attach decoded token to request
+      req.wixAuth = decoded;
+      req.instanceId = instanceId;
+
+      if (!instanceId) {
+        logger.warn('Could not extract instanceId from token', {
+          tokenKeys: Object.keys(decoded),
+          hasData: !!decoded.data
+        });
+        // Some endpoints might work without instanceId, but log for debugging
+      }
+
+      logger.debug('JWT validated successfully', { 
+        instanceId: req.instanceId,
+        hasInstanceId: !!req.instanceId
+      });
+      next();
+    } catch (verifyError) {
+      // In development, try to decode without verification for debugging
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn('JWT verification failed, attempting decode without verification (development only):', verifyError.message);
+        try {
+          const decoded = jwt.decode(token);
+          if (decoded) {
+            req.wixAuth = decoded;
+            req.instanceId = decoded.instanceId || decoded.sub || decoded.app_instance_id;
+            logger.warn('Using unverified token (development only)');
+            return next();
+          }
+        } catch (decodeError) {
+          // Fall through to error response
+        }
+      }
+      
+      logger.error('JWT validation failed:', verifyError);
+      return res.status(401).json({ 
+        error: 'Invalid authorization token',
+        message: process.env.NODE_ENV === 'development' ? verifyError.message : undefined
+      });
+    }
   } catch (error) {
-    logger.error('JWT validation failed:', error);
-    return res.status(401).json({ 
-      error: 'Invalid authorization token',
+    logger.error('Unexpected error in JWT validation:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
       message: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
