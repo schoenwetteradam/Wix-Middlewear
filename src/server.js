@@ -22,6 +22,7 @@ import notificationRoutes from './routes/notifications.js';
 import webhookRoutes from './routes/webhooks.js';
 import healthRoutes from './routes/health.js';
 import installRoutes from './routes/install.js';
+import authRoutes from './routes/auth.js';
 
 const app = express();
 
@@ -101,6 +102,9 @@ app.use('/health', healthRoutes);
 
 // Installation routes (for admin/debugging)
 app.use('/install', installRoutes);
+
+// OAuth authentication routes
+app.use('/auth', authRoutes);
 
 // API routes
 app.use('/api/appointments', appointmentRoutes);
