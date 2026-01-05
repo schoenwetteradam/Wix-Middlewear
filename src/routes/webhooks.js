@@ -4,6 +4,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
 import notificationService from '../services/notificationService.js';
 import crmService from '../services/crmService.js';
+import bookingsService from '../services/bookingsService.js';
 import config from '../config/config.js';
 
 const router = express.Router();
@@ -95,6 +96,7 @@ const verifyWebhookSignature = (req, res, next) => {
 /**
  * Process booking created event
  * Shared handler for both route-based and event-type-based webhooks
+ * Saves booking to Wix Data Collection and sends confirmation email
  */
 function handleBookingCreated(instanceId, data, eventType) {
   logger.info('Booking created webhook received', {
@@ -117,6 +119,35 @@ function handleBookingCreated(instanceId, data, eventType) {
         bookingId: booking.id || booking._id,
         instanceId,
       });
+
+      // Save booking to Wix Data Collection (SalonAppointments)
+      try {
+        const bookingData = {
+          contactId: booking.contactId || booking.contact?.id,
+          customerName: booking.contact?.name || booking.customerName || booking.participant?.name,
+          customerEmail: booking.contact?.email || booking.customerEmail || booking.participant?.email,
+          customerPhone: booking.contact?.phone || booking.customerPhone || booking.participant?.phone,
+          serviceId: booking.serviceId || booking.service?.id,
+          serviceName: booking.service?.name || booking.serviceName,
+          staffMemberId: booking.staffMemberId || booking.staffMember?.id,
+          staffName: booking.staffMember?.name || booking.staffName,
+          startTime: booking.startDate || booking.startTime || booking.slot?.startDate,
+          endTime: booking.endDate || booking.endTime || booking.slot?.endDate,
+          duration: booking.duration || booking.slot?.duration,
+          status: booking.status || 'confirmed',
+          notes: booking.notes || booking.comment || '',
+          totalPrice: booking.totalPrice || booking.price?.amount || 0,
+        };
+
+        await bookingsService.createBooking(instanceId, bookingData);
+        logger.info('Booking saved to SalonAppointments collection', {
+          bookingId: booking.id || booking._id,
+          instanceId,
+        });
+      } catch (saveError) {
+        logger.error('Failed to save booking to collection:', saveError);
+        // Continue to send email even if save fails
+      }
 
       // Send confirmation email asynchronously
       if (booking.contactId && instanceId) {
