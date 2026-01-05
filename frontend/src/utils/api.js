@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { createClient } from '@wix/sdk';
 import { dashboard } from '@wix/dashboard';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
