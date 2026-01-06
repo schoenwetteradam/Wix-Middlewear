@@ -155,6 +155,30 @@ const verifyWebhookSignature = (req, res, next) => {
 };
 
 /**
+ * Extract booking data from different Wix webhook event structures
+ * Handles: createdEvent, actionEvent, updatedEvent
+ */
+function extractBookingFromEvent(data) {
+  // Booking Created: createdEvent.entity
+  if (data?.createdEvent?.entity) {
+    return data.createdEvent.entity;
+  }
+  
+  // Booking Updated: updatedEvent.currentEntityAsJson
+  if (data?.updatedEvent?.currentEntityAsJson) {
+    return data.updatedEvent.currentEntityAsJson;
+  }
+  
+  // Booking Declined/Rescheduled/MarkedAsPending: actionEvent.body.booking
+  if (data?.actionEvent?.body?.booking) {
+    return data.actionEvent.body.booking;
+  }
+  
+  // Fallback: direct booking or entity
+  return data?.booking || data?.entity || data;
+}
+
+/**
  * Process booking created event
  * Shared handler for both route-based and event-type-based webhooks
  * Saves booking to Wix Data Collection and sends confirmation email
@@ -168,8 +192,8 @@ handleBookingCreated = function(instanceId, data, eventType) {
   // Process webhook asynchronously (fire and forget)
   setImmediate(async () => {
     try {
-      // Handle different data structures
-      const booking = data?.booking || data?.entity || data;
+      // Extract booking from event structure
+      const booking = extractBookingFromEvent(data);
 
       if (!booking) {
         logger.warn('Booking created webhook: no booking data found', { data });
@@ -183,21 +207,31 @@ handleBookingCreated = function(instanceId, data, eventType) {
 
       // Save booking to Wix Data Collection (SalonAppointments)
       try {
+        // Extract data from Wix v2 booking structure
+        const slot = booking.bookedEntity?.slot || booking.slot;
+        const contactDetails = booking.contactDetails || booking.contact;
+        const resource = slot?.resource;
+        
         const bookingData = {
-          contactId: booking.contactId || booking.contact?.id,
-          customerName: booking.contact?.name || booking.customerName || booking.participant?.name,
-          customerEmail: booking.contact?.email || booking.customerEmail || booking.participant?.email,
-          customerPhone: booking.contact?.phone || booking.customerPhone || booking.participant?.phone,
-          serviceId: booking.serviceId || booking.service?.id,
-          serviceName: booking.service?.name || booking.serviceName,
-          staffMemberId: booking.staffMemberId || booking.staffMember?.id,
-          staffName: booking.staffMember?.name || booking.staffName,
-          startTime: booking.startDate || booking.startTime || booking.slot?.startDate,
-          endTime: booking.endDate || booking.endTime || booking.slot?.endDate,
-          duration: booking.duration || booking.slot?.duration,
-          status: booking.status || 'confirmed',
+          contactId: contactDetails?.contactId || booking.contactId,
+          customerName: contactDetails?.firstName && contactDetails?.lastName 
+            ? `${contactDetails.firstName} ${contactDetails.lastName}`
+            : contactDetails?.firstName || contactDetails?.name || booking.customerName,
+          customerEmail: contactDetails?.email || booking.customerEmail,
+          customerPhone: contactDetails?.phone || booking.customerPhone,
+          serviceId: slot?.serviceId || booking.serviceId,
+          serviceName: booking.bookedEntity?.item?.service?.name || slot?.service?.name || booking.serviceName,
+          staffMemberId: resource?.id || booking.staffMemberId,
+          staffName: resource?.name || booking.staffName,
+          startTime: slot?.startDate || booking.startDate || booking.startTime,
+          endTime: slot?.endDate || booking.endDate || booking.endTime,
+          duration: slot?.duration || booking.duration,
+          status: booking.status || 'CREATED',
           notes: booking.notes || booking.comment || '',
-          totalPrice: booking.totalPrice || booking.price?.amount || 0,
+          totalPrice: booking.totalPrice || booking.paymentStatus === 'PAID' ? booking.totalPrice : 0,
+          locationId: slot?.location?.id,
+          locationName: slot?.location?.name,
+          numberOfParticipants: booking.numberOfParticipants || booking.totalParticipants || 1,
         };
 
         await bookingsService.createBooking(instanceId, bookingData);
@@ -211,9 +245,11 @@ handleBookingCreated = function(instanceId, data, eventType) {
       }
 
       // Send confirmation email asynchronously
-      if (booking.contactId && instanceId) {
+      const contactDetails = booking.contactDetails || booking.contact;
+      const contactId = contactDetails?.contactId || booking.contactId;
+      if (contactId && instanceId) {
         try {
-          const contact = await crmService.getContact(instanceId, booking.contactId);
+          const contact = await crmService.getContact(instanceId, contactId);
           if (contact?.emails?.[0]?.email) {
             await notificationService.sendAppointmentConfirmation(booking, contact);
           }
@@ -376,19 +412,71 @@ router.post('/*', verifyWebhookSignature, asyncHandler(async (req, res) => {
 
   // Handle different event types (like the Wix sample code pattern)
   switch (eventType) {
+    // Booking Created
     case 'wix.bookings.v2.booking_created':
     case 'wix.bookings.v1.booking_created':
-    case 'wix.bookings.v2.booking_updated':
-    case 'wix.bookings.v1.booking_updated':
     case 'bookings/booking-created':
-    case 'bookings/booking-updated':
-      logger.info('Booking created/updated event detected via catch-all handler', {
+      logger.info('Booking created event detected via catch-all handler', {
         eventType,
         instanceId,
       });
       handleBookingCreated(instanceId, data, eventType);
       break;
 
+    // Booking Updated
+    case 'wix.bookings.v2.booking_updated':
+    case 'wix.bookings.v1.booking_updated':
+    case 'bookings/booking-updated':
+      logger.info('Booking updated event detected via catch-all handler', {
+        eventType,
+        instanceId,
+      });
+      setImmediate(async () => {
+        try {
+          const booking = extractBookingFromEvent(data);
+          if (booking?.id) {
+            logger.info('Processing booking update', {
+              bookingId: booking.id,
+              instanceId,
+              status: booking.status,
+            });
+            // Update booking in collection if needed
+          }
+        } catch (error) {
+          logger.error('Error processing booking updated webhook (async):', error);
+        }
+      });
+      break;
+
+    // Booking Declined
+    case 'wix.bookings.v2.booking_declined':
+    case 'wix.bookings.v1.booking_declined':
+    case 'bookings/booking-declined':
+      logger.info('Booking declined event detected via catch-all handler', {
+        eventType,
+        instanceId,
+      });
+      setImmediate(async () => {
+        try {
+          const booking = extractBookingFromEvent(data);
+          const contactDetails = booking?.contactDetails || booking?.contact;
+          if (contactDetails?.contactId && instanceId) {
+            try {
+              const contact = await crmService.getContact(instanceId, contactDetails.contactId);
+              if (contact?.emails?.[0]?.email) {
+                await notificationService.sendAppointmentCancellation(booking, contact);
+              }
+            } catch (emailError) {
+              logger.error('Failed to send booking declined email:', emailError);
+            }
+          }
+        } catch (error) {
+          logger.error('Error processing booking declined webhook (async):', error);
+        }
+      });
+      break;
+
+    // Booking Cancelled
     case 'wix.bookings.v2.booking_cancelled':
     case 'wix.bookings.v1.booking_cancelled':
     case 'bookings/booking-cancelled':
@@ -396,13 +484,13 @@ router.post('/*', verifyWebhookSignature, asyncHandler(async (req, res) => {
         eventType,
         instanceId,
       });
-      // Process booking cancelled asynchronously
       setImmediate(async () => {
         try {
-          const booking = data?.booking || data?.entity || data;
-          if (booking?.contactId && instanceId) {
+          const booking = extractBookingFromEvent(data);
+          const contactDetails = booking?.contactDetails || booking?.contact;
+          if (contactDetails?.contactId && instanceId) {
             try {
-              const contact = await crmService.getContact(instanceId, booking.contactId);
+              const contact = await crmService.getContact(instanceId, contactDetails.contactId);
               if (contact?.emails?.[0]?.email) {
                 await notificationService.sendAppointmentCancellation(booking, contact);
               }
@@ -412,6 +500,71 @@ router.post('/*', verifyWebhookSignature, asyncHandler(async (req, res) => {
           }
         } catch (error) {
           logger.error('Error processing booking cancelled webhook (async):', error);
+        }
+      });
+      break;
+
+    // Booking Rescheduled
+    case 'wix.bookings.v2.booking_rescheduled':
+    case 'wix.bookings.v1.booking_rescheduled':
+    case 'bookings/booking-rescheduled':
+      logger.info('Booking rescheduled event detected via catch-all handler', {
+        eventType,
+        instanceId,
+      });
+      setImmediate(async () => {
+        try {
+          const booking = extractBookingFromEvent(data);
+          logger.info('Processing booking reschedule', {
+            bookingId: booking?.id,
+            instanceId,
+            newStartDate: booking?.startDate,
+            previousStartDate: data?.actionEvent?.body?.previousStartDate,
+          });
+          // Update booking in collection with new times
+        } catch (error) {
+          logger.error('Error processing booking rescheduled webhook (async):', error);
+        }
+      });
+      break;
+
+    // Booking Marked As Pending
+    case 'wix.bookings.v2.booking_markedAsPending':
+    case 'bookings/booking-markedAsPending':
+      logger.info('Booking marked as pending event detected via catch-all handler', {
+        eventType,
+        instanceId,
+      });
+      setImmediate(async () => {
+        try {
+          const booking = extractBookingFromEvent(data);
+          logger.info('Processing booking marked as pending', {
+            bookingId: booking?.id,
+            instanceId,
+          });
+        } catch (error) {
+          logger.error('Error processing booking marked as pending webhook (async):', error);
+        }
+      });
+      break;
+
+    // Number Of Participants Updated
+    case 'wix.bookings.v2.booking_number_of_participants_updated':
+    case 'bookings/booking-number_of_participants_updated':
+      logger.info('Booking number of participants updated event detected via catch-all handler', {
+        eventType,
+        instanceId,
+      });
+      setImmediate(async () => {
+        try {
+          const booking = extractBookingFromEvent(data);
+          logger.info('Processing number of participants update', {
+            bookingId: booking?.id,
+            instanceId,
+            numberOfParticipants: booking?.numberOfParticipants || booking?.totalParticipants,
+          });
+        } catch (error) {
+          logger.error('Error processing number of participants updated webhook (async):', error);
         }
       });
       break;
