@@ -1,5 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import { AppStrategy, createClient } from '@wix/sdk';
+import { bookings } from '@wix/bookings';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
 import notificationService from '../services/notificationService.js';
@@ -8,6 +10,65 @@ import bookingsService from '../services/bookingsService.js';
 import config from '../config/config.js';
 
 const router = express.Router();
+
+// Forward declaration for handleBookingCreated
+let handleBookingCreated;
+
+// Create Wix SDK client for webhook processing
+let wixWebhookClient = null;
+if (config.wix.appId && config.wix.publicKey) {
+  try {
+    wixWebhookClient = createClient({
+      auth: AppStrategy({
+        appId: config.wix.appId,
+        publicKey: config.wix.publicKey,
+      }),
+      modules: { bookings },
+    });
+    
+    logger.info('Wix SDK webhook client initialized');
+  } catch (error) {
+    logger.warn('Failed to initialize Wix SDK webhook client:', error.message);
+  }
+}
+
+/**
+ * Main webhook endpoint - processes all webhook events using Wix SDK
+ * This is the recommended approach from Wix documentation
+ */
+router.post('/', express.text({ type: '*/*' }), asyncHandler(async (req, res) => {
+  try {
+    // Try using Wix SDK first (recommended approach)
+    if (wixWebhookClient) {
+      try {
+        await wixWebhookClient.webhooks.process(req.body);
+        logger.debug('Webhook processed successfully via Wix SDK');
+        return res.status(200).send();
+      } catch (sdkError) {
+        logger.warn('Wix SDK webhook processing failed, falling back to manual verification:', sdkError.message);
+        // Fall through to manual verification
+      }
+    }
+    
+    // Fallback to manual JWT verification
+    return verifyWebhookSignature(req, res, () => {
+      const { instanceId, data, eventType } = req.wixEvent;
+      
+      // Handle booking created events
+      if (eventType?.includes('booking_created') || eventType?.includes('booking-created')) {
+        handleBookingCreated(instanceId, data, eventType);
+      }
+      
+      res.status(200).json({ success: true, message: 'Webhook received (manual verification)' });
+    });
+  } catch (error) {
+    logger.error('Webhook processing error:', error);
+    return res.status(500).json({
+      error: 'Webhook processing failed',
+      message: error.message,
+    });
+  }
+}));
 
 /**
  * Middleware to verify Wix webhook JWT signature
@@ -98,7 +159,7 @@ const verifyWebhookSignature = (req, res, next) => {
  * Shared handler for both route-based and event-type-based webhooks
  * Saves booking to Wix Data Collection and sends confirmation email
  */
-function handleBookingCreated(instanceId, data, eventType) {
+handleBookingCreated = function(instanceId, data, eventType) {
   logger.info('Booking created webhook received', {
     instanceId,
     eventType,
@@ -166,7 +227,7 @@ function handleBookingCreated(instanceId, data, eventType) {
       logger.error('Error processing booking created webhook (async):', error);
     }
   });
-}
+};
 
 /**
  * POST /plugins-and-webhooks/bookings/created
