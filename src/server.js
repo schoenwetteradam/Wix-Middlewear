@@ -63,15 +63,9 @@ app.use('/plugins-and-webhooks', express.text({ type: '*/*' }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Root endpoint - Handle Wix app installation or serve React app
-app.get('/', (req, res, next) => {
-  // If there's a token parameter, this is a Wix app installation request
-  if (req.query.token) {
-    // Forward to installation handler
-    return installRoutes(req, res, next);
-  }
-
-  // Otherwise, serve the React frontend
+// Root endpoint - Always serve React app
+// Wix handles installation automatically - no need for custom install endpoint
+app.get('/', (req, res) => {
   const frontendPath = path.join(__dirname, '../frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
@@ -89,7 +83,6 @@ app.get('/', (req, res, next) => {
           dashboard: '/api/dashboard',
           notifications: '/api/notifications',
           webhooks: '/plugins-and-webhooks',
-          install: '/?token=<installation_token>',
         },
         note: 'Frontend build not found. Run "npm run build:frontend" to build the React app.',
       });
@@ -100,7 +93,8 @@ app.get('/', (req, res, next) => {
 // Health check endpoint
 app.use('/health', healthRoutes);
 
-// Installation routes (for admin/debugging)
+// Installation routes (optional - Wix handles installation automatically)
+// Only used if Wix explicitly calls this endpoint
 app.use('/install', installRoutes);
 
 // OAuth authentication routes
