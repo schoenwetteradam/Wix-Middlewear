@@ -66,6 +66,15 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Root endpoint - Always serve React app
 // Wix handles installation automatically - no need for custom install endpoint
 app.get('/', (req, res) => {
+// Root endpoint - Handle Wix app installation or serve React app
+app.get('/', (req, res, next) => {
+  // If there's a token, instance, appInstance, or code parameter, this is a Wix app installation request
+  if (req.query.token || req.query.instance || req.query.appInstance || req.query.code) {
+    // Forward to installation handler
+    return installRoutes(req, res, next);
+  }
+
+  // Otherwise, serve the React frontend
   const frontendPath = path.join(__dirname, '../frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
