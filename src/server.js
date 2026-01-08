@@ -63,9 +63,6 @@ app.use('/plugins-and-webhooks', express.text({ type: '*/*' }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Root endpoint - Always serve React app
-// Wix handles installation automatically - no need for custom install endpoint
-app.get('/', (req, res) => {
 // Root endpoint - Handle Wix app installation or serve React app
 app.get('/', (req, res, next) => {
   // If there's a token, instance, appInstance, or code parameter, this is a Wix app installation request
