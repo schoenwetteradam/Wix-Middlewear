@@ -13,6 +13,9 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Get project root directory (works in both local and Vercel environments)
+const projectRoot = process.cwd();
+
 // Import routes
 import appointmentRoutes from './routes/appointments.js';
 import eventsRoutes from './routes/events.js';
@@ -72,7 +75,7 @@ app.get('/', (req, res, next) => {
   }
 
   // Otherwise, serve the React frontend
-  const frontendPath = path.join(__dirname, '../frontend/build/index.html');
+  const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
       // If build doesn't exist, fall back to API info
@@ -117,7 +120,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/plugins-and-webhooks', webhookRoutes);
 
 // Serve static files from React frontend build (if it exists)
-const frontendBuildPath = path.join(__dirname, '../frontend/build');
+const frontendBuildPath = path.join(projectRoot, 'frontend/build');
 app.use(express.static(frontendBuildPath));
 
 // Catch-all handler: serve React app for client-side routing
@@ -132,7 +135,7 @@ app.get('*', (req, res, next) => {
   }
 
   // Serve React app for all other routes (client-side routing)
-  const frontendPath = path.join(__dirname, '../frontend/build/index.html');
+  const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
       logger.warn(`Frontend file not found for ${req.path}:`, err.message);
