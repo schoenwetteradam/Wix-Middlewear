@@ -4,8 +4,10 @@
   "description": "Custom Wix app for salon events, appointments, and staff management",
   "main": "src/server.js",
   "type": "module",
+  "packageManager": "npm@10.5.2",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x",
+    "npm": "10.x"
   },
   "scripts": {
     "start": "node src/server.js",
