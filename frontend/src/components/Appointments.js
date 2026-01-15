@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { appointmentsAPI, staffAPI } from '../utils/api';
 import { format } from 'date-fns';
@@ -11,11 +11,7 @@ function Appointments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, [filterStaff, filterStatus]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [appointmentsRes, staffRes] = await Promise.all([
@@ -35,7 +31,11 @@ function Appointments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterStaff, filterStatus]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleCancelAppointment = async (appointmentId) => {
     if (!window.confirm('Are you sure you want to cancel this appointment?')) {
