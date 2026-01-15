@@ -1,19 +1,11 @@
 {
-  "version": 2,
+  "installCommand": "npm ci",
   "buildCommand": "npm run build:frontend",
-  "builds": [
+  "outputDirectory": "frontend/build",
+  "rewrites": [
     {
-      "src": "api/index.js",
-      "use": "@vercel/node"
+      "source": "/(.*)",
+      "destination": "/api/index.js"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "api/index.js"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }

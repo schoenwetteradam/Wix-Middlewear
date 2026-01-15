@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { dashboardAPI } from '../utils/api';
 import { format } from 'date-fns';
@@ -10,11 +10,7 @@ function StaffSchedule() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadStaffSchedule();
-  }, [selectedDate]);
-
-  const loadStaffSchedule = async () => {
+  const loadStaffSchedule = useCallback(async () => {
     try {
       setLoading(true);
       const response = await dashboardAPI.getStaffOverview({ date: selectedDate });
@@ -26,7 +22,11 @@ function StaffSchedule() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadStaffSchedule();
+  }, [loadStaffSchedule]);
 
   if (loading) {
     return <div className="loading">Loading staff schedule...</div>;

@@ -13,6 +13,9 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Get project root directory (works in both local and Vercel environments)
+const projectRoot = process.cwd();
+
 // Import routes
 import appointmentRoutes from './routes/appointments.js';
 import eventsRoutes from './routes/events.js';
@@ -29,6 +32,7 @@ const app = express();
 // Security middleware - apply Helmet with permissive CSP for all routes
 // This is safe since we control all content and need inline scripts for installation
 app.use(helmet({
+  frameguard: false, // Wix embeds the app in an iframe
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -40,6 +44,7 @@ app.use(helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
+      frameAncestors: ["'self'", "https://*.wix.com", "https://*.wixsite.com", "https://manage.wix.com"],
     },
   },
 }));
@@ -60,38 +65,36 @@ app.use(morgan('combined', {
 // Body parsing middleware
 // Note: Webhook routes use express.text() to preserve raw body for JWT verification
 app.use('/plugins-and-webhooks', express.text({ type: '*/*' }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Root endpoint - Handle Wix app installation or serve React app
-app.get('/', (req, res, next) => {
-  // If there's a token, instance, appInstance, or code parameter, this is a Wix app installation request
-  if (req.query.token || req.query.instance || req.query.appInstance || req.query.code) {
-    // Forward to installation handler
-    return installRoutes(req, res, next);
+app.use((req, res, next) => {
+  if (req.path.startsWith('/plugins-and-webhooks')) {
+    return next();
   }
+  return bodyParser.json()(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path.startsWith('/plugins-and-webhooks')) {
+    return next();
+  }
+  return bodyParser.urlencoded({ extended: true })(req, res, next);
+});
 
-  // Otherwise, serve the React frontend
-  const frontendPath = path.join(__dirname, '../frontend/build/index.html');
+// Root endpoint - Always serve React app
+// Wix handles installation automatically via OAuth callback
+app.get('/', (req, res, next) => {
+  // Serve the React frontend
+  const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
-      // If build doesn't exist, fall back to API info
-      logger.warn('Frontend build not found, serving API info');
-      res.json({
-        service: 'Salon Events Wix App API',
-        version: '1.0.0',
-        status: 'running',
-        endpoints: {
-          health: '/health',
-          appointments: '/api/appointments',
-          events: '/api/events',
-          staff: '/api/staff',
-          dashboard: '/api/dashboard',
-          notifications: '/api/notifications',
-          webhooks: '/plugins-and-webhooks',
-        },
-        note: 'Frontend build not found. Run "npm run build:frontend" to build the React app.',
-      });
+      // If build doesn't exist, return a minimal HTML page so Wix can render it
+      logger.warn('Frontend build not found, serving fallback HTML');
+      res
+        .status(200)
+        .send(
+          '<!DOCTYPE html><html><head><title>Wix App</title></head><body>' +
+            '<h1>Wix App is running</h1>' +
+            '<p>The frontend build was not found. Run <code>npm run build:frontend</code> and redeploy.</p>' +
+            '</body></html>'
+        );
     }
   });
 });
@@ -117,7 +120,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/plugins-and-webhooks', webhookRoutes);
 
 // Serve static files from React frontend build (if it exists)
-const frontendBuildPath = path.join(__dirname, '../frontend/build');
+const frontendBuildPath = path.join(projectRoot, 'frontend/build');
 app.use(express.static(frontendBuildPath));
 
 // Catch-all handler: serve React app for client-side routing
@@ -132,7 +135,7 @@ app.get('*', (req, res, next) => {
   }
 
   // Serve React app for all other routes (client-side routing)
-  const frontendPath = path.join(__dirname, '../frontend/build/index.html');
+  const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {
       logger.warn(`Frontend file not found for ${req.path}:`, err.message);

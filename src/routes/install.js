@@ -1,6 +1,5 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import config from '../config/config.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -9,178 +8,46 @@ const router = express.Router();
 const installedInstances = new Map();
 
 /**
- * Wix app installation endpoint
- * Called when a user installs the app from Wix
- * Handles multiple formats: token parameter, instance parameter, or appInstance parameter
+ * Wix app installation endpoint (optional - Wix handles installation automatically)
+ * This endpoint is only used if Wix explicitly calls it during installation
+ * Wix handles the installation flow via OAuth callback, so this is minimal
  */
 router.get('/', async (req, res) => {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:17',message:'Install route entry',data:{query:req.query,headers:Object.keys(req.headers),path:req.path,method:req.method},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    const { token, instance, appInstance, redirectUrl, code } = req.query;
-    let instanceId = null;
-    let tokenData = null;
-
-    // If we have a code parameter, this is an OAuth callback after authorization
-    // For app updates, Wix may send the code directly
-    if (code) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:25',message:'OAuth callback detected',data:{code:code?.substring(0,20)+'...',instance,appInstance,redirectUrl,hasRedirectUrl:!!redirectUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      logger.info('OAuth callback received with authorization code');
-      // Extract instanceId from the code if possible, or redirect to close window
-      // For now, we'll treat this as a successful installation
-      instanceId = instance || appInstance;
-      
-      // If we have a redirectUrl, redirect back to Wix immediately
-      // This is critical for app updates to be recognized
-      if (redirectUrl) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:33',message:'Redirecting with redirectUrl',data:{redirectUrl,instanceId,hasInstanceId:!!instanceId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
-        logger.info('Redirect URL provided, redirecting back to Wix', { redirectUrl, instanceId });
-        // Store instance before redirecting
-        if (instanceId) {
-          installedInstances.set(instanceId, {
-            instanceId,
-            installedAt: new Date(),
-            updated: true,
-          });
-        }
-        return res.redirect(redirectUrl);
-      }
-    }
-
-    // Check for instance ID in different query parameters
-    if (instance) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:49',message:'Instance ID from instance param',data:{instanceId:instance},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      // Direct instance ID parameter
-      instanceId = instance;
-      logger.info('Instance ID from query parameter:', { instanceId });
-    } else if (appInstance) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:54',message:'Instance ID from appInstance param',data:{instanceId:appInstance},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      // App instance parameter
-      instanceId = appInstance;
-      logger.info('Instance ID from appInstance parameter:', { instanceId });
-    } else if (token) {
-      // Token parameter - could be JWT, instance ID, or other format
+    logger.info('Install endpoint called', { query: req.query });
+    
+    // Extract instance information if provided (for logging/debugging)
+    const { instance, appInstance, token } = req.query;
+    let instanceId = instance || appInstance;
+    
+    // If we have a token, try to extract instance ID from it (for logging only)
+    if (!instanceId && token) {
       try {
-        // Try to decode as JWT first
         const decodedToken = jwt.decode(token);
-
         if (decodedToken && typeof decodedToken === 'object') {
-          // It's a valid JWT
-          logger.info('Decoded JWT token:', { decodedToken });
-
-          // If we have a public key, verify the signature
-          if (config.wix.publicKey) {
-            try {
-              jwt.verify(token, config.wix.publicKey, {
-                algorithms: ['RS256'],
-              });
-              logger.info('Token signature verified');
-            } catch (verifyError) {
-              logger.warn('Token signature verification failed:', verifyError.message);
-              // Continue anyway - we'll use the decoded data
-            }
-          }
-
-          // Extract instance ID from JWT
           instanceId = decodedToken.instanceId || decodedToken.instance || decodedToken.sub || decodedToken.app_instance_id;
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:81',message:'Instance ID extracted from JWT',data:{instanceId,decodedKeys:Object.keys(decodedToken)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          tokenData = decodedToken;
-        } else {
-          // Not a JWT - might be the instance ID itself
-          instanceId = token;
-          logger.info('Using token as instance ID directly:', { instanceId });
         }
       } catch (error) {
-        // Failed to decode as JWT - use token as instance ID
-        instanceId = token;
-        logger.info('Token is not JWT, using as instance ID:', { instanceId });
+        // Ignore - token might not be a JWT
       }
     }
-
-    // Store the instance information if we have it
+    
+    // Store instance for debugging/admin purposes (optional)
     if (instanceId) {
       installedInstances.set(instanceId, {
         instanceId,
         installedAt: new Date(),
-        tokenData: tokenData,
       });
+      logger.info('Instance stored', { instanceId, totalInstances: installedInstances.size });
     }
-
-    logger.info('App installation completed', {
-      instanceId,
-      totalInstances: installedInstances.size,
-    });
-
-    // If we have a redirectUrl, redirect back to Wix immediately
-    if (redirectUrl) {
-      return res.redirect(redirectUrl);
-    }
-
-    // Otherwise, redirect to Wix site management (or return minimal success response)
-    // This completes installation silently - user goes back to Wix to add widgets
-    res.status(200).send('<!DOCTYPE html><html><head><script>if(window.parent!==window)window.parent.postMessage({type:"wix-app-installed",status:"success"}, "*");window.close();</script></head><body>Installation complete. Please close this window.</body></html>');
+    
+    // Return minimal success response
+    // Wix handles all redirects and installation flow automatically
+    // This endpoint just acknowledges the request
+    res.status(200).send('<!DOCTYPE html><html><head><title>Installation</title></head><body><p>Installation acknowledged. Wix will handle the rest.</p></body></html>');
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1a8886f-a737-43ed-aaab-432ab29a507f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'install.js:312',message:'Installation error',data:{error:error.message,stack:error.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    logger.error('Installation error:', error);
-    res.status(500).send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Installation Error</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              margin: 0;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            }
-            .container {
-              background: white;
-              padding: 3rem;
-              border-radius: 1rem;
-              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-              text-align: center;
-              max-width: 500px;
-            }
-            h1 { color: #e53e3e; margin-bottom: 1rem; }
-            p { color: #4a5568; line-height: 1.6; }
-            .error-details {
-              background: #fff5f5;
-              border: 1px solid #feb2b2;
-              padding: 1rem;
-              border-radius: 0.5rem;
-              margin-top: 1rem;
-              text-align: left;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>❌ Installation Failed</h1>
-            <p>An error occurred during installation. Please try again or contact support.</p>
-            <div class="error-details">
-              <strong>Error:</strong> ${error.message}
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
+    logger.error('Installation endpoint error:', error);
+    res.status(500).json({ error: 'Installation error', message: error.message });
   }
 });
 
