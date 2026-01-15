@@ -66,15 +66,10 @@ app.use('/plugins-and-webhooks', express.text({ type: '*/*' }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Root endpoint - Handle Wix app installation or serve React app
+// Root endpoint - Always serve React app
+// Wix handles installation automatically via OAuth callback
 app.get('/', (req, res, next) => {
-  // If there's a token, instance, appInstance, or code parameter, this is a Wix app installation request
-  if (req.query.token || req.query.instance || req.query.appInstance || req.query.code) {
-    // Forward to installation handler
-    return installRoutes(req, res, next);
-  }
-
-  // Otherwise, serve the React frontend
+  // Serve the React frontend
   const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
     if (err) {

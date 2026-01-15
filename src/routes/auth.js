@@ -5,8 +5,8 @@ const router = express.Router();
 
 /**
  * OAuth callback endpoint
- * Called by Wix after OAuth authentication
- * Redirects to root path (/) with query parameters, which is handled by install route
+ * Called by Wix after OAuth authentication during app installation
+ * Wix handles the installation flow automatically - this endpoint just acknowledges receipt
  */
 router.get('/callback', (req, res) => {
   logger.info('OAuth callback received', {
@@ -14,13 +14,28 @@ router.get('/callback', (req, res) => {
     path: req.path,
   });
 
-  // Redirect to root with query parameters
-  // The root route (/) handles OAuth callbacks via the install route
-  const queryString = new URLSearchParams(req.query).toString();
-  const redirectUrl = queryString ? `/?${queryString}` : '/';
+  // Extract authorization code if present (for logging)
+  const { code, instance, appInstance, redirectUrl } = req.query;
   
-  logger.info('Redirecting OAuth callback to root', { redirectUrl });
-  return res.redirect(redirectUrl);
+  // Log the callback for debugging
+  if (code) {
+    logger.info('OAuth authorization code received', { 
+      hasCode: !!code,
+      instance: instance || appInstance,
+      hasRedirectUrl: !!redirectUrl 
+    });
+  }
+
+  // If Wix provided a redirectUrl, redirect back to Wix
+  // This allows Wix to complete the installation flow
+  if (redirectUrl) {
+    logger.info('Redirecting back to Wix', { redirectUrl });
+    return res.redirect(redirectUrl);
+  }
+
+  // Otherwise, return minimal success response
+  // Wix will handle the rest of the installation flow
+  res.status(200).send('<!DOCTYPE html><html><head><title>OAuth Callback</title></head><body><p>OAuth callback received. Wix will complete the installation.</p></body></html>');
 });
 
 export default router;
