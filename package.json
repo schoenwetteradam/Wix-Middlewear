@@ -12,9 +12,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:frontend": "cd frontend && npm ci && npm run build",
     "build": "npm run build:frontend",
-    "postinstall": "cd frontend && npm install",
+    "postinstall": "cd frontend && npm ci",
     "test": "jest"
   },
   "keywords": [
