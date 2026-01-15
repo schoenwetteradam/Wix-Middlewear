@@ -1,23 +1,27 @@
 import axios from 'axios';
 import { dashboard } from '@wix/dashboard';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+const DEFAULT_API_BASE_URL = typeof window !== 'undefined'
+  ? `${window.location.origin}/api`
+  : 'http://localhost:3000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || DEFAULT_API_BASE_URL;
 
 // Check if we're running in Wix environment
 let isWixEnvironment = false;
 if (typeof window !== 'undefined') {
+  const host = window.location.hostname || '';
   isWixEnvironment = !!(
-    window.wixBiSession || 
-    window.parent !== window || 
+    window.wixBiSession ||
     window.location.search.includes('token=') ||
-    window.location.hostname.includes('wix.com') ||
-    window.location.hostname.includes('wixsite.com')
+    host.includes('wix.com') ||
+    host.includes('wixsite.com') ||
+    host.includes('wixstudio.com')
   );
 }
 
 // Helper function to get auth token from Wix SDK
 async function getWixAuthToken() {
-  if (!isWixEnvironment || !dashboard) {
+  if (!isWixEnvironment || !dashboard || typeof dashboard.auth !== 'function') {
     return null;
   }
 
