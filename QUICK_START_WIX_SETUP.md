@@ -34,7 +34,7 @@ Base URL: `https://your-app.vercel.app/plugins-and-webhooks`
 
 #### E. Dashboard Extension
 Create dashboard pages for staff access:
-- **Main Dashboard:** `https://your-app.vercel.app/`
+- **Main Dashboard:** `https://your-app.vercel.app/` (or `/dashboard`)
 - **Appointments:** `https://your-app.vercel.app/appointments`
 - **Staff Schedule:** `https://your-app.vercel.app/staff-schedule`
 - **Events:** `https://your-app.vercel.app/events`

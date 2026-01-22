@@ -56,7 +56,7 @@ https://your-domain.com/auth/callback
 
 **App URL (for installed apps):**
 ```
-https://your-domain.com/dashboard
+https://your-domain.com/
 ```
 
 ### Step 3: Retrieve Your Credentials
@@ -174,7 +174,7 @@ The dashboard extension provides staff with access to the management interface.
   "type": "dashboard-page",
   "name": "Salon Dashboard",
   "description": "Staff dashboard for managing appointments and events",
-  "url": "https://your-domain.com/dashboard",
+    "url": "https://your-domain.com/",
   "icon": "https://your-domain.com/assets/icon.png",
   "placement": {
     "location": "dashboard",
@@ -187,7 +187,7 @@ The dashboard extension provides staff with access to the management interface.
 
 **Page URL:**
 ```
-https://your-domain.com/dashboard
+https://your-domain.com/
 ```
 
 This URL should serve your React frontend application.
@@ -196,7 +196,7 @@ This URL should serve your React frontend application.
 
 You may want to create multiple dashboard pages:
 
-1. **Main Dashboard:** `https://your-domain.com/`
+1. **Main Dashboard:** `https://your-domain.com/` (or `/dashboard` if you prefer)
 2. **Appointments:** `https://your-domain.com/appointments`
 3. **Staff Schedule:** `https://your-domain.com/staff-schedule`
 4. **Events:** `https://your-domain.com/events`

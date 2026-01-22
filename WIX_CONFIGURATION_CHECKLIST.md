@@ -153,7 +153,7 @@ Create a Dashboard Page extension:
 #### Configuration:
 - **Extension Name:** "Salon Management Dashboard"
 - **Extension Type:** Dashboard Page
-- **Page URL:** `https://your-app.vercel.app/`
+- **Page URL:** `https://your-app.vercel.app/` (or `/dashboard`)
 - **Icon URL:** (optional) Your app icon URL
 - **Description:** "Manage appointments, events, and staff schedules"
 
@@ -161,7 +161,7 @@ Create a Dashboard Page extension:
 
 1. **Main Dashboard:**
    - **Name:** "Dashboard"
-   - **URL:** `https://your-app.vercel.app/`
+   - **URL:** `https://your-app.vercel.app/` (or `/dashboard`)
 
 2. **Appointments:**
    - **Name:** "Appointments"
@@ -260,7 +260,7 @@ Create the following collections (see `WIX_DATA_COLLECTIONS.md` for detailed sch
 2. Find your custom app in the list
 3. Click **"Install"**
 4. Authorize the requested permissions
-5. After installation, note the **Instance ID** (you'll see it in the installation success page)
+5. After installation, confirm the **Instance ID** was received in your server logs or the `app/installed` webhook logs
 
 ---
 
