@@ -14,6 +14,7 @@ function App() {
         <Routes>
           {/* Staff Dashboard Pages */}
           <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/staff-schedule" element={<StaffSchedule />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/events" element={<Events />} />
