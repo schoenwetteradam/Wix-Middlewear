@@ -29,6 +29,10 @@ import authRoutes from './routes/auth.js';
 
 const app = express();
 
+// In-memory diagnostics for install/auth requests (recent only)
+const requestDiagnostics = [];
+const MAX_REQUEST_DIAGNOSTICS = 30;
+
 // Security middleware - apply Helmet with permissive CSP for all routes
 // This is safe since we control all content and need inline scripts for installation
 app.use(helmet({
@@ -78,6 +82,43 @@ app.use((req, res, next) => {
   return bodyParser.urlencoded({ extended: true })(req, res, next);
 });
 
+// Capture install/auth related requests for troubleshooting
+app.use((req, res, next) => {
+  const hasInstallSignals = Boolean(
+    req.path.startsWith('/install') ||
+    req.path.startsWith('/auth') ||
+    req.query?.instance ||
+    req.query?.appInstance ||
+    req.query?.token ||
+    req.query?.code ||
+    req.query?.redirectUrl ||
+    req.query?.returnUrl
+  );
+
+  if (hasInstallSignals) {
+    requestDiagnostics.unshift({
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      headers: {
+        host: req.headers.host,
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        'user-agent': req.headers['user-agent'],
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-forwarded-host': req.headers['x-forwarded-host'],
+        'x-forwarded-proto': req.headers['x-forwarded-proto'],
+      },
+    });
+    if (requestDiagnostics.length > MAX_REQUEST_DIAGNOSTICS) {
+      requestDiagnostics.length = MAX_REQUEST_DIAGNOSTICS;
+    }
+  }
+
+  next();
+});
+
 // Root endpoint - Always serve React app
 // Wix handles installation automatically via OAuth callback
 app.get('/', (req, res, next) => {
@@ -105,6 +146,14 @@ app.use('/health', healthRoutes);
 // Installation routes (optional - Wix handles installation automatically)
 // Only used if Wix explicitly calls this endpoint
 app.use('/install', installRoutes);
+
+// Diagnostic endpoint for install/auth troubleshooting
+app.get('/diagnostics/requests', (req, res) => {
+  res.json({
+    success: true,
+    recentRequests: requestDiagnostics,
+  });
+});
 
 // OAuth authentication routes
 app.use('/auth', authRoutes);
