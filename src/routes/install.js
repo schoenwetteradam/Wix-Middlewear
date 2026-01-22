@@ -1,11 +1,30 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import path from 'path';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+const projectRoot = process.cwd();
 
 // In-memory storage for installed instances (in production, use a database)
 const installedInstances = new Map();
+
+function sendFrontend(res) {
+  const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
+  res.sendFile(frontendPath, (err) => {
+    if (err) {
+      logger.warn('Frontend build not found for install route, serving fallback HTML');
+      res
+        .status(200)
+        .send(
+          '<!DOCTYPE html><html><head><title>Wix App</title></head><body>' +
+            '<h1>Wix App is running</h1>' +
+            '<p>The frontend build was not found. Run <code>npm run build:frontend</code> and redeploy.</p>' +
+            '</body></html>'
+        );
+    }
+  });
+}
 
 /**
  * Wix app installation endpoint (optional - Wix handles installation automatically)
@@ -48,10 +67,9 @@ const handleInstall = async (req, res) => {
       return res.redirect(redirectTarget);
     }
     
-    // Return minimal success response
-    // Wix handles all redirects and installation flow automatically
-    // This endpoint just acknowledges the request
-    res.status(200).send('<!DOCTYPE html><html><head><title>Installation</title></head><body><p>Installation acknowledged. Wix will handle the rest.</p></body></html>');
+    // Serve the app if this URL is used as the App URL by mistake
+    // This keeps the installation flow working even if /install is configured
+    return sendFrontend(res);
   } catch (error) {
     logger.error('Installation endpoint error:', error);
     res.status(500).json({ error: 'Installation error', message: error.message });

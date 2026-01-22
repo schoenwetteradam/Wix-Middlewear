@@ -15,22 +15,23 @@ router.get('/callback', (req, res) => {
   });
 
   // Extract authorization code if present (for logging)
-  const { code, instance, appInstance, redirectUrl } = req.query;
+  const { code, instance, appInstance, redirectUrl, returnUrl } = req.query;
   
   // Log the callback for debugging
   if (code) {
     logger.info('OAuth authorization code received', { 
       hasCode: !!code,
       instance: instance || appInstance,
-      hasRedirectUrl: !!redirectUrl 
+      hasRedirectUrl: !!(redirectUrl || returnUrl),
     });
   }
 
   // If Wix provided a redirectUrl, redirect back to Wix
   // This allows Wix to complete the installation flow
-  if (redirectUrl) {
-    logger.info('Redirecting back to Wix', { redirectUrl });
-    return res.redirect(redirectUrl);
+  const redirectTarget = redirectUrl || returnUrl;
+  if (redirectTarget) {
+    logger.info('Redirecting back to Wix', { redirectUrl: redirectTarget });
+    return res.redirect(redirectTarget);
   }
 
   // Otherwise, return minimal success response
