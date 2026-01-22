@@ -9,6 +9,10 @@ const projectRoot = process.cwd();
 // In-memory storage for installed instances (in production, use a database)
 const installedInstances = new Map();
 
+// In-memory diagnostics for install flow (recent requests)
+const installDiagnostics = [];
+const MAX_DIAGNOSTICS = 20;
+
 function sendFrontend(res) {
   const frontendPath = path.join(projectRoot, 'frontend/build/index.html');
   res.sendFile(frontendPath, (err) => {
@@ -60,6 +64,28 @@ const handleInstall = async (req, res) => {
       logger.info('Instance stored', { instanceId, totalInstances: installedInstances.size });
     }
 
+    installDiagnostics.unshift({
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      headers: {
+        host: req.headers.host,
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        'user-agent': req.headers['user-agent'],
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-forwarded-host': req.headers['x-forwarded-host'],
+        'x-forwarded-proto': req.headers['x-forwarded-proto'],
+        authorization: req.headers.authorization ? 'present' : 'missing',
+      },
+      redirectTarget: redirectUrl || returnUrl || req.body?.redirectUrl || req.body?.returnUrl || null,
+      instanceId: instanceId || null,
+    });
+    if (installDiagnostics.length > MAX_DIAGNOSTICS) {
+      installDiagnostics.length = MAX_DIAGNOSTICS;
+    }
+
     // If Wix provided a redirect URL, send the user back to Wix to finish install
     const redirectTarget = redirectUrl || returnUrl || req.body?.redirectUrl || req.body?.returnUrl;
     if (redirectTarget) {
@@ -78,6 +104,18 @@ const handleInstall = async (req, res) => {
 
 router.get('/', handleInstall);
 router.post('/', handleInstall);
+
+/**
+ * GET /install/diagnostics
+ * Returns recent install requests for troubleshooting
+ */
+router.get('/diagnostics', (req, res) => {
+  res.json({
+    success: true,
+    totalInstances: installedInstances.size,
+    recentRequests: installDiagnostics,
+  });
+});
 
 /**
  * Get list of installed instances (for debugging/admin purposes)
