@@ -12,12 +12,12 @@ const installedInstances = new Map();
  * This endpoint is only used if Wix explicitly calls it during installation
  * Wix handles the installation flow via OAuth callback, so this is minimal
  */
-router.get('/', async (req, res) => {
+const handleInstall = async (req, res) => {
   try {
     logger.info('Install endpoint called', { query: req.query });
     
     // Extract instance information if provided (for logging/debugging)
-    const { instance, appInstance, token } = req.query;
+    const { instance, appInstance, token, redirectUrl, returnUrl } = req.query;
     let instanceId = instance || appInstance;
     
     // If we have a token, try to extract instance ID from it (for logging only)
@@ -40,6 +40,13 @@ router.get('/', async (req, res) => {
       });
       logger.info('Instance stored', { instanceId, totalInstances: installedInstances.size });
     }
+
+    // If Wix provided a redirect URL, send the user back to Wix to finish install
+    const redirectTarget = redirectUrl || returnUrl || req.body?.redirectUrl || req.body?.returnUrl;
+    if (redirectTarget) {
+      logger.info('Redirecting back to Wix from install', { redirectUrl: redirectTarget });
+      return res.redirect(redirectTarget);
+    }
     
     // Return minimal success response
     // Wix handles all redirects and installation flow automatically
@@ -49,7 +56,10 @@ router.get('/', async (req, res) => {
     logger.error('Installation endpoint error:', error);
     res.status(500).json({ error: 'Installation error', message: error.message });
   }
-});
+};
+
+router.get('/', handleInstall);
+router.post('/', handleInstall);
 
 /**
  * Get list of installed instances (for debugging/admin purposes)

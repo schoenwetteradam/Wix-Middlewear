@@ -19,9 +19,18 @@ if (typeof window !== 'undefined') {
   );
 }
 
-// Helper function to get auth token from Wix SDK
+// Helper function to get auth token from Wix SDK or URL
 async function getWixAuthToken() {
-  if (!isWixEnvironment || !dashboard || typeof dashboard.auth !== 'function') {
+  if (!isWixEnvironment) {
+    return null;
+  }
+
+  const queryToken = getAuthTokenFromQuery();
+  if (queryToken) {
+    return queryToken.startsWith('Bearer ') ? queryToken : `Bearer ${queryToken}`;
+  }
+
+  if (!dashboard || typeof dashboard.auth !== 'function') {
     return null;
   }
 
@@ -56,7 +65,21 @@ async function getWixAuthToken() {
     return null;
   } catch (error) {
     // Some Wix environments throw internally; treat as no token
-    console.warn('Failed to get Wix auth token:', error.message);
+    const message = error?.message || String(error);
+    console.warn('Failed to get Wix auth token:', message);
+    return null;
+  }
+}
+
+function getAuthTokenFromQuery() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('token');
+  } catch (error) {
     return null;
   }
 }
