@@ -1,5 +1,7 @@
 import axios from 'axios';
+import { createClient } from '@wix/sdk';
 import { dashboard } from '@wix/dashboard';
+import { site } from '@wix/site';
 
 const DEFAULT_API_BASE_URL = typeof window !== 'undefined'
   ? `${window.location.origin}/api`
@@ -17,6 +19,40 @@ if (typeof window !== 'undefined') {
     host.includes('wixsite.com') ||
     host.includes('wixstudio.com')
   );
+}
+
+let wixClient = null;
+
+function getWixClient() {
+  if (!isWixEnvironment) {
+    return null;
+  }
+
+  if (wixClient) {
+    return wixClient;
+  }
+
+  try {
+    if (dashboard?.auth && dashboard?.host) {
+      wixClient = createClient({
+        auth: dashboard.auth(),
+        host: dashboard.host(),
+      });
+      return wixClient;
+    }
+    if (site?.auth && site?.host) {
+      wixClient = createClient({
+        auth: site.auth(),
+        host: site.host(),
+      });
+      return wixClient;
+    }
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn('Failed to initialize Wix SDK client:', message);
+  }
+
+  return null;
 }
 
 // Helper function to get auth token from Wix SDK or URL
@@ -161,10 +197,11 @@ export default api;
 async function request(method, url, options = {}) {
   const { params, data } = options;
 
-  if (isWixEnvironment && typeof dashboard?.fetchWithAuth === 'function') {
+  const client = getWixClient();
+  if (isWixEnvironment && typeof client?.fetchWithAuth === 'function') {
     const search = params ? `?${new URLSearchParams(params).toString()}` : '';
     const fullUrl = `${API_BASE_URL}${url}${search}`;
-    const response = await dashboard.fetchWithAuth(fullUrl, {
+    const response = await client.fetchWithAuth(fullUrl, {
       method: method.toUpperCase(),
       headers: {
         'Content-Type': 'application/json',
